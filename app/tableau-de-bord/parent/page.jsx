@@ -1,5 +1,5 @@
 import ProtectedRoute from '../../../src/components/ProtectedRoute'
-import ParentDashboardPage from '../../../src/pages/ParentDashboardPage'
+import ParentDashboardPage from '../../../src/views/ParentDashboardPage'
 
 export default function Page() {
   return (

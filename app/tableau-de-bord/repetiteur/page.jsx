@@ -1,5 +1,5 @@
 import ProtectedRoute from '../../../src/components/ProtectedRoute'
-import TutorDashboardPage from '../../../src/pages/TutorDashboardPage'
+import TutorDashboardPage from '../../../src/views/TutorDashboardPage'
 
 export default function Page() {
   return (

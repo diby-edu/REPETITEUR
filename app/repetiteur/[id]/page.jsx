@@ -1,2 +1,2 @@
-import TutorProfilePage from '../../../src/pages/TutorProfilePage'
+import TutorProfilePage from '../../../src/views/TutorProfilePage'
 export default TutorProfilePage

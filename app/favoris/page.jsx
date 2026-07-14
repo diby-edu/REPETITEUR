@@ -1,5 +1,5 @@
 import ProtectedRoute from '../../src/components/ProtectedRoute'
-import FavoritesPage from '../../src/pages/FavoritesPage'
+import FavoritesPage from '../../src/views/FavoritesPage'
 
 export default function Page() {
   return (

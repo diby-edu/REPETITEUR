@@ -1,2 +1,2 @@
-import ForgotPasswordPage from '../../src/pages/ForgotPasswordPage'
+import ForgotPasswordPage from '../../src/views/ForgotPasswordPage'
 export default ForgotPasswordPage

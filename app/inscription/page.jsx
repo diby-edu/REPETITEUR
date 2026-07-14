@@ -1,2 +1,2 @@
-import RegisterPage from '../../src/pages/RegisterPage'
+import RegisterPage from '../../src/views/RegisterPage'
 export default RegisterPage

@@ -1,2 +1,2 @@
-import ResetPasswordPage from '../../src/pages/ResetPasswordPage'
+import ResetPasswordPage from '../../src/views/ResetPasswordPage'
 export default ResetPasswordPage

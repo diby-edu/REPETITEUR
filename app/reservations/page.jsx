@@ -1,5 +1,5 @@
 import ProtectedRoute from '../../src/components/ProtectedRoute'
-import BookingPage from '../../src/pages/BookingPage'
+import BookingPage from '../../src/views/BookingPage'
 
 export default function Page() {
   return (

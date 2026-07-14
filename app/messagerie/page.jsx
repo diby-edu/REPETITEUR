@@ -1,5 +1,5 @@
 import ProtectedRoute from '../../src/components/ProtectedRoute'
-import MessagingPage from '../../src/pages/MessagingPage'
+import MessagingPage from '../../src/views/MessagingPage'
 
 export default function Page() {
   return (

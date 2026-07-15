@@ -129,19 +129,18 @@ export function AppProvider({ children }) {
   }, [])
 
   // ── Chargement initial des tuteurs ──────────────────────────
-  useEffect(() => {
-    const loadTutors = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, tutors(*)')
-        .eq('role', 'tutor')
-        .not('tutors', 'is', null)
+  const reloadTutors = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, tutors(*)')
+      .eq('role', 'tutor')
+      .not('tutors', 'is', null)
 
-      if (error) { console.error('loadTutors:', error); return }
-      setTutors(data.map(p => mapTutor(p, p.tutors)))
-    }
-    loadTutors()
+    if (error) { console.error('loadTutors:', error); return }
+    setTutors(data.map(p => mapTutor(p, p.tutors)))
   }, [])
+
+  useEffect(() => { reloadTutors() }, [reloadTutors])
 
   // ── TUTEURS ─────────────────────────────────────────────────
   const getTutor = (id) => tutors.find(t => t.id === id)
@@ -598,7 +597,7 @@ export function AppProvider({ children }) {
       getTutorReviews, getUserBookings, getUserNotifications,
       markNotificationsRead, deleteNotification, getUnreadNotifCount,
       subscribeToNotifications,
-      getActiveTutors, getPendingTutors,
+      getActiveTutors, getPendingTutors, reloadTutors,
       toggleFavorite, getUserFavorites, isFavorite,
       showToast,
     }}>

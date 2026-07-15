@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import Avatar from '../components/common/Avatar'
@@ -8,14 +8,14 @@ import StarRating from '../components/common/StarRating'
 import {
   Users, GraduationCap, Calendar, TrendingUp, ShieldCheck,
   CheckCircle, XCircle, Eye, Trash2, AlertTriangle, Search,
-  Filter, BarChart3, FileText
+  Filter, BarChart3, FileText, ExternalLink,
 } from 'lucide-react'
 import { formatDateShort, formatFCFA } from '../utils/helpers'
 
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements']
 
 export default function AdminDashboardPage() {
-  const { tutors, validateTutor, suspendTutor, showToast } = useApp()
+  const { tutors, validateTutor, suspendTutor, showToast, reloadTutors } = useApp()
   const [activeTab, setActiveTab] = useState('Vue globale')
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -33,7 +33,23 @@ export default function AdminDashboardPage() {
     supabase.from('bookings').select('*').then(({ data }) => {
       if (data) setBookings(data.map(b => ({ ...b, status: b.status })))
     })
-  }, [])
+
+    const channel = supabase
+      .channel('admin-tutors-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tutors' }, () => {
+        reloadTutors()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [reloadTutors])
+
+  const viewDocument = useCallback(async (path) => {
+    if (!path) return
+    const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 3600)
+    if (error) { showToast('Impossible d\'ouvrir le document.', 'error'); return }
+    window.open(data.signedUrl, '_blank')
+  }, [showToast])
 
   const pending = tutors.filter(t => t.verificationStatus === 'pending')
   const verified = tutors.filter(t => t.verificationStatus === 'verified')
@@ -262,19 +278,68 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="text-xs text-gray-400 mt-1">Inscrit le {formatDateShort(tutor.joinDate)}</p>
                   </div>
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 min-w-[200px]">
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-gray-600 mb-2">Documents soumis :</p>
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className={`w-2 h-2 rounded-full ${tutor.documents?.cni ? 'bg-green-400' : 'bg-red-400'}`} />
-                        <span className="text-gray-600">CNI</span>
-                        {tutor.documents?.cni && <span className="text-green-600">✓ Soumise</span>}
-                      </div>
-                      {(tutor.documents?.diplomes || []).map((d, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs">
+                      {/* Pièce d'identité */}
+                      {tutor.documents?.idType === 'cni' && (
+                        <>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-2 h-2 rounded-full ${tutor.documents?.cniRecto ? 'bg-green-400' : 'bg-red-400'}`} />
+                              <span className="text-gray-600">CNI — Recto</span>
+                            </div>
+                            {tutor.documents?.cniRectoPath && (
+                              <button onClick={() => viewDocument(tutor.documents.cniRectoPath)} className="flex items-center gap-1 text-primary hover:underline">
+                                <ExternalLink size={11} /> Voir
+                              </button>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-2 h-2 rounded-full ${tutor.documents?.cniVerso ? 'bg-green-400' : 'bg-red-400'}`} />
+                              <span className="text-gray-600">CNI — Verso</span>
+                            </div>
+                            {tutor.documents?.cniVersoPath && (
+                              <button onClick={() => viewDocument(tutor.documents.cniVersoPath)} className="flex items-center gap-1 text-primary hover:underline">
+                                <ExternalLink size={11} /> Voir
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                      {tutor.documents?.idType === 'passport' && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <div className={`w-2 h-2 rounded-full ${tutor.documents?.passport ? 'bg-green-400' : 'bg-red-400'}`} />
+                            <span className="text-gray-600">Passeport</span>
+                          </div>
+                          {tutor.documents?.passportPath && (
+                            <button onClick={() => viewDocument(tutor.documents.passportPath)} className="flex items-center gap-1 text-primary hover:underline">
+                              <ExternalLink size={11} /> Voir
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {/* Legacy: anciens comptes sans idType */}
+                      {!tutor.documents?.idType && tutor.documents?.cni && (
+                        <div className="flex items-center gap-1.5 text-xs">
                           <div className="w-2 h-2 rounded-full bg-green-400" />
-                          <span className="text-gray-600">{d}</span>
-                          <span className="text-green-600">✓</span>
+                          <span className="text-gray-600">CNI soumise</span>
+                        </div>
+                      )}
+                      {/* Diplômes */}
+                      {(tutor.documents?.diplomes || []).map((d, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                            <span className="text-gray-600 truncate">{d.name || d}</span>
+                          </div>
+                          {d.path && (
+                            <button onClick={() => viewDocument(d.path)} className="flex items-center gap-1 text-primary hover:underline flex-shrink-0">
+                              <ExternalLink size={11} /> Voir
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>

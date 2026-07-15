@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
-import { SUBJECTS, LEVELS, CITIES } from '../data/constants'
+import { SUBJECTS, LEVELS } from '../data/constants'
+import CityCombobox from '../components/common/CityCombobox'
 import { CheckCircle, ChevronLeft } from 'lucide-react'
 
 const steps = ['Informations personnelles', 'Préférences', 'Confirmation']
@@ -18,7 +19,8 @@ export default function RegisterParentPage() {
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
-    city: '', childLevel: '', searchedSubjects: [], password: '',
+    city: '', childLevel: '', searchedSubjects: [],
+    openToContact: true, password: '',
   })
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
@@ -41,6 +43,9 @@ export default function RegisterParentPage() {
       phone: form.phone,
       city: form.city,
       avatarColor: '#16A085',
+      subjectsNeeded: form.searchedSubjects,
+      childLevel: form.childLevel,
+      openToContact: form.openToContact,
     })
     setLoading(false)
     if (!result.success) {
@@ -119,6 +124,7 @@ export default function RegisterParentPage() {
         </div>
 
         <div className="card">
+          {/* Step 1: Infos personnelles */}
           {step === 0 && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -128,7 +134,7 @@ export default function RegisterParentPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom *</label>
-                  <input className="input-field" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Ouédraogo" />
+                  <input className="input-field" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Koné" />
                 </div>
               </div>
               <div>
@@ -141,10 +147,7 @@ export default function RegisterParentPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville *</label>
-                <select className="input-field" value={form.city} onChange={e => set('city', e.target.value)}>
-                  <option value="">Choisissez votre ville</option>
-                  {CITIES.map(c => <option key={c}>{c}</option>)}
-                </select>
+                <CityCombobox value={form.city} onChange={city => set('city', city)} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe *</label>
@@ -160,6 +163,7 @@ export default function RegisterParentPage() {
             </div>
           )}
 
+          {/* Step 2: Préférences */}
           {step === 1 && (
             <div className="space-y-5">
               <div>
@@ -192,14 +196,31 @@ export default function RegisterParentPage() {
                       onClick={() => toggleSubject(s)}
                       className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
                         form.searchedSubjects.includes(s)
-                          ? 'bg-primary border-primary text-white'
-                          : 'border-gray-200 text-gray-600 hover:border-primary hover:text-primary'
+                          ? 'bg-secondary border-secondary text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-secondary hover:text-secondary'
                       }`}
                     >
                       {s}
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-xl p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.openToContact}
+                    onChange={e => set('openToContact', e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-secondary flex-shrink-0"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Accepter d'être contacté par des répétiteurs</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Les répétiteurs correspondant à votre profil pourront vous envoyer un message en premier. Vous restez libre d'accepter ou d'ignorer.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -211,6 +232,7 @@ export default function RegisterParentPage() {
             </div>
           )}
 
+          {/* Step 3: Confirmation */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="bg-secondary-50 rounded-xl p-4 space-y-2">
@@ -218,10 +240,11 @@ export default function RegisterParentPage() {
                 {[
                   ['Nom complet', `${form.firstName} ${form.lastName}`],
                   ['Email', form.email],
-                  ['Téléphone', form.phone],
+                  ['Téléphone', form.phone || '—'],
                   ['Ville', form.city],
                   ['Niveau de l\'enfant', form.childLevel],
                   ['Matières recherchées', form.searchedSubjects.join(', ') || 'Non spécifié'],
+                  ['Ouvert aux contacts répétiteurs', form.openToContact ? 'Oui' : 'Non'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm">
                     <span className="text-gray-500">{k}</span>

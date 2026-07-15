@@ -40,7 +40,7 @@ export async function POST(request) {
       },
       store: {
         name: 'MonRépétiteur',
-        tagline: "La plateforme des répétiteurs en Afrique de l'Ouest",
+        tagline: "La plateforme des répétiteurs en Côte d'Ivoire",
         postal_address: 'Abidjan, Côte d\'Ivoire',
       },
       actions: {

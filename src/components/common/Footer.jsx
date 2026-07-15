@@ -18,11 +18,11 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed">
-              La plateforme de référence pour trouver un répétiteur qualifié en Afrique de l'Ouest francophone.
+              La plateforme de référence pour trouver un répétiteur qualifié en Côte d'Ivoire.
             </p>
             <div className="flex items-center gap-1.5 mt-3 text-xs text-gray-500">
               <MapPin size={12} />
-              <span>Zone UEMOA — Afrique de l'Ouest</span>
+              <span>Côte d'Ivoire</span>
             </div>
           </div>
 
@@ -73,13 +73,9 @@ export default function Footer() {
                 +225 27 22 XX XX XX
               </li>
             </ul>
-            <div className="mt-4">
-              <p className="text-xs text-gray-500 mb-2">Disponible dans :</p>
-              <div className="flex flex-wrap gap-1">
-                {['🇨🇮', '🇸🇳', '🇲🇱', '🇧🇫', '🇹🇬', '🇧🇯', '🇬🇳', '🇳🇪'].map((flag, i) => (
-                  <span key={i} className="text-base" title="UEMOA">{flag}</span>
-                ))}
-              </div>
+            <div className="mt-4 flex items-center gap-2 text-sm text-gray-400">
+              <span className="text-xl">🇨🇮</span>
+              <span>Côte d'Ivoire</span>
             </div>
           </div>
         </div>

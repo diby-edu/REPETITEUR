@@ -1,26 +1,32 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabase'
 import Avatar from '../components/common/Avatar'
 import StarRating from '../components/common/StarRating'
 import { VerifiedBadge, PremiumBadge, StatusBadge } from '../components/common/Badge'
 import {
   Eye, TrendingUp, Calendar, Star, MessageCircle, Clock,
   ShieldCheck, CreditCard, AlertCircle, CheckCircle, ChevronRight,
-  BarChart3, Users, BookOpen
+  BarChart3, Users, BookOpen, Send, MapPin, GraduationCap,
 } from 'lucide-react'
-import { formatFCFA, formatDate, formatDateShort, getSubscriptionDaysLeft, getStatusLabel, getLocationLabel } from '../utils/helpers'
+import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } from '../utils/helpers'
 
 export default function TutorDashboardPage() {
   const { currentUser } = useAuth()
+  const router = useRouter()
   const {
     getUserConversations, getUserBookings, getUserNotifications, getUnreadNotifCount,
     loadUserConversations, loadUserBookings, loadUserNotifications, subscribeToNotifications,
+    getOrCreateConversation,
   } = useApp()
 
   const tutor = currentUser
+  const [matchingParents, setMatchingParents] = useState([])
+  const [contactingId, setContactingId] = useState(null)
 
   useEffect(() => {
     if (tutor?.id) {
@@ -30,6 +36,43 @@ export default function TutorDashboardPage() {
       return subscribeToNotifications(tutor.id)
     }
   }, [tutor?.id])
+
+  useEffect(() => {
+    if (!tutor?.city) return
+    const load = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_level, join_date')
+        .eq('role', 'parent')
+        .eq('open_to_contact', true)
+        .eq('city', tutor.city)
+        .order('join_date', { ascending: false })
+        .limit(12)
+      if (!data) return
+      const filtered = tutor.subjects?.length
+        ? data.filter(p => !p.subjects_needed?.length || p.subjects_needed.some(s => tutor.subjects.includes(s)))
+        : data
+      setMatchingParents(filtered.map(p => ({
+        id: p.id,
+        firstName: p.first_name,
+        lastName: p.last_name,
+        city: p.city,
+        avatarColor: p.avatar_color,
+        childLevel: p.child_level,
+        subjectsNeeded: p.subjects_needed || [],
+        joinDate: p.join_date,
+      })))
+    }
+    load()
+  }, [tutor?.city, tutor?.subjects])
+
+  const handleContactParent = async (parentId) => {
+    if (contactingId) return
+    setContactingId(parentId)
+    const conv = await getOrCreateConversation(tutor.id, parentId)
+    setContactingId(null)
+    if (conv) router.push(`/messagerie/${conv.id}`)
+  }
 
   const conversations = getUserConversations(tutor.id)
   const bookings = getUserBookings(tutor.id, 'tutor')
@@ -336,6 +379,87 @@ export default function TutorDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Parents qui cherchent un répétiteur */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Users size={18} className="text-secondary" />
+                Parents qui cherchent un répétiteur à {tutor.city}
+              </h2>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {matchingParents.length > 0
+                  ? `${matchingParents.length} parent${matchingParents.length > 1 ? 's' : ''} correspondent à votre profil`
+                  : 'Aucun parent correspondant pour l\'instant'}
+              </p>
+            </div>
+          </div>
+
+          {matchingParents.length === 0 ? (
+            <div className="card text-center py-10">
+              <Users size={40} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Aucun parent dans votre ville n'a encore activé le contact répétiteur.</p>
+              <p className="text-xs text-gray-300 mt-1">Revenez bientôt — la communauté grandit !</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {matchingParents.map(parent => (
+                <div key={parent.id} className="card flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                      style={{ backgroundColor: parent.avatarColor || '#16A085' }}
+                    >
+                      {parent.firstName?.[0]}{parent.lastName?.[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{parent.firstName} {parent.lastName?.[0]}.</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <MapPin size={11} /> {parent.city}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {parent.childLevel && (
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <GraduationCap size={13} className="text-secondary flex-shrink-0" />
+                        <span>Niveau : <strong>{parent.childLevel}</strong></span>
+                      </div>
+                    )}
+                    {parent.subjectsNeeded?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {parent.subjectsNeeded.slice(0, 3).map(s => (
+                          <span key={s} className={`text-xs px-2 py-0.5 rounded-full font-medium ${tutor.subjects?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>
+                            {s}
+                          </span>
+                        ))}
+                        {parent.subjectsNeeded.length > 3 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                            +{parent.subjectsNeeded.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => handleContactParent(parent.id)}
+                    disabled={contactingId === parent.id}
+                    className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {contactingId === parent.id
+                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <Send size={13} />}
+                    Contacter
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )

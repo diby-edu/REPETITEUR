@@ -30,6 +30,10 @@ export function AuthProvider({ children }) {
       quartier: profile.quartier,
       avatarColor: profile.avatar_color,
       joinDate: profile.join_date,
+      // Données parent
+      subjectsNeeded: profile.subjects_needed || [],
+      childLevel: profile.child_level || null,
+      openToContact: profile.open_to_contact !== false,
       // Données tutor
       ...(tutor && {
         bio: tutor.bio,
@@ -113,6 +117,11 @@ export function AuthProvider({ children }) {
             modalities: tutorData.modalities || [],
             availability: tutorData.availability || {},
             documents: tutorData.documents || {},
+          }),
+          ...(role === 'parent' && {
+            subjects_needed: tutorData.subjectsNeeded || [],
+            child_level: tutorData.childLevel || null,
+            open_to_contact: tutorData.openToContact !== false,
           }),
         },
       },

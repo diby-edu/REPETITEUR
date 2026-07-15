@@ -121,8 +121,8 @@ export function getDayLabel(day) {
 }
 
 export const MODALITIES = [
-  { id: 'domicile_parent', label: 'Domicile du parent', desc: 'Le répétiteur se déplace chez vous' },
-  { id: 'domicile_repetiteur', label: 'Domicile du répétiteur', desc: 'Vous amenez votre enfant chez le répétiteur' },
+  { id: 'domicile_parent', label: 'Domicile du parent', desc: 'Je me déplace chez l\'élève' },
+  { id: 'domicile_repetiteur', label: 'Domicile du répétiteur', desc: 'L\'élève vient chez moi' },
   { id: 'lieu_neutre', label: 'Lieu neutre', desc: 'Bibliothèque, école, espace d\'étude, café...' },
   { id: 'en_ligne', label: 'En ligne', desc: 'Cours à distance par visioconférence' },
 ]

@@ -7,20 +7,24 @@ export const SUBJECTS = [
 export const LEVELS = ['Primaire', 'Collège', 'Lycée', 'Supérieur']
 
 export const CITIES = [
-  'Abidjan', 'Dakar', 'Bamako', 'Ouagadougou', 'Lomé',
-  'Cotonou', 'Niamey', 'Conakry', 'Bissau'
+  'Abidjan', 'Yamoussoukro', 'Bouaké', 'Daloa', 'Korhogo',
+  'San-Pédro', 'Man', 'Gagnoa', 'Abengourou', 'Divo',
+  'Soubré', 'Duekoué', 'Tabou', 'Grand-Bassam', 'Jacqueville',
+  'Tiassalé', 'Agboville', 'Adzopé', 'Aboisso', 'Bondoukou',
+  'Odienné', 'Touba', 'Séguéla', 'Vavoua', 'Issia',
+  'Lakota', 'Guiglo', 'Bangolo', 'Biankouma', 'Danané',
+  'Sassandra', 'Fresco', 'Grand-Lahou', 'Bouaflé', 'Sinfra',
+  'Zuénoula', 'Bongouanou', 'Dimbokro', 'Toumodi', 'Katiola',
+  'Dabakala', 'Ferkessédougou', 'Boundiali', 'Tengrela', 'Bouna',
+  'Tanda', 'Nassian', 'Béoumi', 'Sakassou', 'Daoukro',
 ]
 
 export const QUARTIERS_BY_CITY = {
-  'Abidjan': ['Cocody', 'Plateau', 'Yopougon', 'Marcory', 'Adjamé', 'Abobo', 'Koumassi', 'Treichville'],
-  'Dakar': ['Plateau', 'Médina', 'Grand-Dakar', 'Pikine', 'Guédiawaye', 'Ouakam', 'Almadies'],
-  'Bamako': ['Hippodrome', 'ACI 2000', 'Badalabougou', 'Lafiabougou', 'Magnambougou', 'Hamdallaye'],
-  'Ouagadougou': ['Gounghin', 'Dapoya', 'Pissy', 'Wemtenga', 'Hamdalaye', 'Nongremassom'],
-  'Lomé': ['Agoè', 'Bè', 'Nyékonakpoè', 'Tokoin', 'Zongo', 'Adidogomé'],
-  'Cotonou': ['Akpakpa', 'Cadjehoun', 'Fidjrossè', 'Haie Vive', 'Agla', 'Gbèdjromèdji'],
-  'Niamey': ['Plateau', 'Gamkalley', 'Zongo', 'Lazaret', 'Boukoki', 'Talladjé'],
-  'Conakry': ['Kaloum', 'Matam', 'Ratoma', 'Matoto', 'Dixinn'],
-  'Bissau': ['Bairro do Liceu', 'Santa Luzia', 'Bandim', 'Belém'],
+  'Abidjan': [
+    'Cocody', 'Plateau', 'Yopougon', 'Marcory', 'Adjamé',
+    'Abobo', 'Koumassi', 'Treichville', 'Port-Bouët', 'Attécoubé',
+    'Bingerville', 'Songon', 'Anyama', 'Alepe',
+  ],
 }
 
 export const SUBSCRIPTION_PLANS = [

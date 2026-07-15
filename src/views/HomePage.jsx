@@ -48,7 +48,7 @@ export default function HomePage() {
   const stats = [
     { value: '500+', label: 'Répétiteurs vérifiés' },
     { value: '2 400+', label: 'Séances complétées' },
-    { value: '8', label: 'Pays UEMOA' },
+    { value: '50+', label: 'Villes en Côte d\'Ivoire' },
     { value: '4.8★', label: 'Note moyenne' },
   ]
 
@@ -74,7 +74,7 @@ export default function HomePage() {
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-1.5 mb-5 text-sm font-medium">
               <span className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-              Disponible dans 8 pays de la zone UEMOA
+              La plateforme des répétiteurs en Côte d'Ivoire
             </div>
             <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold leading-tight mb-4">
               Le meilleur répétiteur<br />
@@ -83,7 +83,7 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="text-lg sm:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
-              Trouvez un répétiteur qualifié et vérifié près de chez vous en Afrique de l'Ouest francophone.
+              Trouvez un répétiteur qualifié et vérifié près de chez vous en Côte d'Ivoire.
             </p>
           </div>
 
@@ -225,9 +225,9 @@ export default function HomePage() {
           </div>
           <div className="grid md:grid-cols-3 gap-5">
             {[
-              { name: 'A. Ouédraogo', city: 'Abidjan', text: 'Grâce à MonRépétiteur, mon fils est passé de 8 à 16 en mathématiques en 2 mois. Vraiment incroyable !', rating: 5 },
-              { name: 'O. Sow', city: 'Dakar', text: 'La plateforme est très facile à utiliser. J\'ai trouvé une excellente répétitrice de français en 10 minutes.', rating: 5 },
-              { name: 'M. Kaboré', city: 'Ouagadougou', text: 'Les répétiteurs sont vraiment vérifiés et professionnels. Je recommande à tous les parents !', rating: 5 },
+              { name: 'A. Ouédraogo', city: 'Abidjan — Cocody', text: 'Grâce à MonRépétiteur, mon fils est passé de 8 à 16 en mathématiques en 2 mois. Vraiment incroyable !', rating: 5 },
+              { name: 'O. Koné', city: 'Bouaké', text: 'La plateforme est très facile à utiliser. J\'ai trouvé une excellente répétitrice de français en 10 minutes.', rating: 5 },
+              { name: 'M. Traoré', city: 'Abidjan — Yopougon', text: 'Les répétiteurs sont vraiment vérifiés et professionnels. Je recommande à tous les parents !', rating: 5 },
             ].map((t, i) => (
               <div key={i} className="card">
                 <StarRating rating={t.rating} showNumber={false} />

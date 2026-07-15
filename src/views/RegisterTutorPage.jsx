@@ -4,9 +4,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { SUBJECTS, LEVELS, CITIES, QUARTIERS_BY_CITY } from '../data/constants'
+import { SUBJECTS, LEVELS, QUARTIERS_BY_CITY } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
-import { CheckCircle, ChevronLeft, Upload, Clock, Info, Home, Building2, Users, Wifi, FileText } from 'lucide-react'
+import CityCombobox from '../components/common/CityCombobox'
+import {
+  CheckCircle, ChevronLeft, Upload, Clock, Info,
+  Home, Building2, Users, Wifi, FileText, Plus, Trash2,
+} from 'lucide-react'
 
 const MODALITY_ICONS = {
   domicile_parent: <Home size={18} />,
@@ -18,8 +22,44 @@ const MODALITY_ICONS = {
 const steps = ['Informations', 'Expertise', 'Documents', 'Confirmation']
 
 const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-const HOURS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
+const SLOTS = ['8h-10h', '10h-12h', '12h-14h', '14h-16h', '16h-18h', '18h-20h']
 const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', vendredi: 'Ven', samedi: 'Sam', dimanche: 'Dim' }
+
+
+function FileUploadZone({ file, onFile, label, inputRef }) {
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        className="hidden"
+        onChange={e => onFile(e.target.files?.[0] || null)}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className={`w-full border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer ${
+          file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+        }`}
+      >
+        {file ? (
+          <>
+            <FileText size={24} className="text-green-500" />
+            <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
+            <span className="text-xs text-gray-400">Cliquer pour changer</span>
+          </>
+        ) : (
+          <>
+            <Upload size={24} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-600 text-center">{label}</span>
+            <span className="text-xs text-gray-400">JPG, PNG ou PDF — max 5 Mo</span>
+          </>
+        )}
+      </button>
+    </>
+  )
+}
 
 export default function RegisterTutorPage() {
   const { register } = useAuth()
@@ -31,13 +71,20 @@ export default function RegisterTutorPage() {
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', password: '',
-    city: '', quartier: '', bio: '',
+    city: 'Abidjan', quartier: '', bio: '',
     subjects: [], levels: [], monthlyRate: '', modalities: [],
     availability: { lundi: [], mardi: [], mercredi: [], jeudi: [], vendredi: [], samedi: [], dimanche: [] },
-    cniFile: null, diplomaFile: null,
+    idType: 'cni',
+    cniRectoFile: null,
+    cniVersoFile: null,
+    passportFile: null,
+    diplomas: [{ name: '', file: null }],
   })
-  const cniInputRef = useRef(null)
-  const diplomaInputRef = useRef(null)
+
+  const cniRectoRef = useRef(null)
+  const cniVersoRef = useRef(null)
+  const passportRef = useRef(null)
+  const diplomaRefs = useRef([])
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
 
@@ -45,19 +92,38 @@ export default function RegisterTutorPage() {
     set(key, form[key].includes(item) ? form[key].filter(x => x !== item) : [...form[key], item])
   }
 
-  const toggleAvailability = (day, hour) => {
+  const toggleAvailability = (day, slot) => {
     const current = form.availability[day]
-    const updated = current.includes(hour) ? current.filter(h => h !== hour) : [...current, hour]
+    const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot]
     set('availability', { ...form.availability, [day]: updated })
   }
 
-  const quartiers = form.city ? (QUARTIERS_BY_CITY[form.city] || []) : []
+  const quartiers = form.city === 'Abidjan' ? (QUARTIERS_BY_CITY['Abidjan'] || []) : []
+
+  const addDiploma = () => {
+    set('diplomas', [...form.diplomas, { name: '', file: null }])
+  }
+
+  const removeDiploma = (i) => {
+    set('diplomas', form.diplomas.filter((_, idx) => idx !== i))
+  }
+
+  const updateDiploma = (i, key, val) => {
+    const updated = form.diplomas.map((d, idx) => idx === i ? { ...d, [key]: val } : d)
+    set('diplomas', updated)
+  }
+
+  const idDocReady = form.idType === 'cni'
+    ? (form.cniRectoFile && form.cniVersoFile)
+    : form.passportFile
+
+  const diplomasReady = form.diplomas.length > 0 &&
+    form.diplomas.every(d => d.name.trim() && d.file)
 
   const handleSubmit = async () => {
     setLoading(true)
     setError('')
 
-    // 1. Créer le compte
     const result = await register({
       email: form.email,
       password: form.password,
@@ -90,27 +156,46 @@ export default function RegisterTutorPage() {
     }
 
     const userId = result.user.id
-    const documents = { cni: false, diplomes: [] }
+    const documents = { idType: form.idType }
 
-    // 2. Uploader CNI
-    if (form.cniFile) {
-      const ext = form.cniFile.name.split('.').pop()
-      const { error: uploadErr } = await supabase.storage
-        .from('documents')
-        .upload(`${userId}/cni.${ext}`, form.cniFile, { upsert: true })
-      if (!uploadErr) documents.cni = true
+    if (form.idType === 'cni') {
+      if (form.cniRectoFile) {
+        const ext = form.cniRectoFile.name.split('.').pop()
+        const { error: e } = await supabase.storage
+          .from('documents')
+          .upload(`${userId}/cni_recto.${ext}`, form.cniRectoFile, { upsert: true })
+        if (!e) { documents.cniRecto = true; documents.cniRectoPath = `${userId}/cni_recto.${ext}` }
+      }
+      if (form.cniVersoFile) {
+        const ext = form.cniVersoFile.name.split('.').pop()
+        const { error: e } = await supabase.storage
+          .from('documents')
+          .upload(`${userId}/cni_verso.${ext}`, form.cniVersoFile, { upsert: true })
+        if (!e) { documents.cniVerso = true; documents.cniVersoPath = `${userId}/cni_verso.${ext}` }
+      }
+    } else {
+      if (form.passportFile) {
+        const ext = form.passportFile.name.split('.').pop()
+        const { error: e } = await supabase.storage
+          .from('documents')
+          .upload(`${userId}/passport.${ext}`, form.passportFile, { upsert: true })
+        if (!e) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}` }
+      }
     }
 
-    // 3. Uploader diplôme
-    if (form.diplomaFile) {
-      const ext = form.diplomaFile.name.split('.').pop()
-      const { error: uploadErr } = await supabase.storage
+    const uploadedDiplomas = []
+    for (let i = 0; i < form.diplomas.length; i++) {
+      const d = form.diplomas[i]
+      if (!d.file) continue
+      const ext = d.file.name.split('.').pop()
+      const path = `${userId}/diplome_${i}.${ext}`
+      const { error: e } = await supabase.storage
         .from('documents')
-        .upload(`${userId}/diplome.${ext}`, form.diplomaFile, { upsert: true })
-      if (!uploadErr) documents.diplomes = [form.diplomaFile.name]
+        .upload(path, d.file, { upsert: true })
+      if (!e) uploadedDiplomas.push({ name: d.name.trim(), path })
     }
+    documents.diplomes = uploadedDiplomas
 
-    // 4. Mettre à jour les documents en DB
     await supabase.from('tutors').update({ documents }).eq('id', userId)
 
     setLoading(false)
@@ -148,7 +233,7 @@ export default function RegisterTutorPage() {
           </div>
           <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Inscription soumise !</h1>
           <p className="text-gray-500 mb-3">
-            Merci <strong>{form.firstName}</strong> ! Votre dossier est en cours de vérification par notre équipe. Vous serez notifié sous 24-48h.
+            Merci <strong>{form.firstName}</strong> ! Votre dossier est en cours de vérification. Vous serez notifié sous 24-48h.
           </p>
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800 mb-6">
             <p className="font-semibold mb-1">En attendant la validation :</p>
@@ -215,18 +300,17 @@ export default function RegisterTutorPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville *</label>
-                  <select className="input-field" value={form.city} onChange={e => { set('city', e.target.value); set('quartier', '') }}>
-                    <option value="">Ville</option>
-                    {CITIES.map(c => <option key={c}>{c}</option>)}
-                  </select>
+                  <CityCombobox value={form.city} onChange={city => { set('city', city); set('quartier', '') }} />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Quartier *</label>
-                  <select className="input-field" value={form.quartier} onChange={e => set('quartier', e.target.value)} disabled={!quartiers.length}>
-                    <option value="">Quartier</option>
-                    {quartiers.map(q => <option key={q}>{q}</option>)}
-                  </select>
-                </div>
+                {quartiers.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Quartier</label>
+                    <select className="input-field" value={form.quartier} onChange={e => set('quartier', e.target.value)}>
+                      <option value="">Quartier</option>
+                      {quartiers.map(q => <option key={q}>{q}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Biographie *</label>
@@ -284,8 +368,7 @@ export default function RegisterTutorPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Tarif horaire (FCFA) *</label>
-                <input type="number" className="input-field" value={form.monthlyRate} onChange={e => set('monthlyRate', e.target.value)} placeholder="Ex: 30000" min="5000" max="200000" step="1000" />
-                <p className="text-xs text-gray-400 mt-1">Tarif recommandé : 15 000 – 80 000 FCFA/mois</p>
+                <input type="number" className="input-field" value={form.monthlyRate} onChange={e => set('monthlyRate', e.target.value)} placeholder="Ex: 3000" min="1000" max="200000" step="500" />
               </div>
 
               <div>
@@ -321,8 +404,8 @@ export default function RegisterTutorPage() {
                     <thead>
                       <tr>
                         <th className="text-left text-gray-500 font-medium py-1 pr-2 w-10"></th>
-                        {HOURS.slice(0, 8).map(h => (
-                          <th key={h} className="text-gray-400 font-normal py-1 px-0.5 text-center">{h.slice(0, 2)}h</th>
+                        {SLOTS.map(slot => (
+                          <th key={slot} className="text-gray-400 font-normal py-1 px-0.5 text-center whitespace-nowrap">{slot}</th>
                         ))}
                       </tr>
                     </thead>
@@ -330,12 +413,12 @@ export default function RegisterTutorPage() {
                       {DAYS.map(day => (
                         <tr key={day}>
                           <td className="text-gray-600 font-medium py-1 pr-2">{DAY_LABELS[day]}</td>
-                          {HOURS.slice(0, 8).map(h => (
-                            <td key={h} className="py-1 px-0.5">
+                          {SLOTS.map(slot => (
+                            <td key={slot} className="py-1 px-0.5">
                               <button
                                 type="button"
-                                onClick={() => toggleAvailability(day, h)}
-                                className={`w-7 h-7 rounded-lg transition-colors ${form.availability[day].includes(h) ? 'bg-primary' : 'bg-gray-100 hover:bg-gray-200'}`}
+                                onClick={() => toggleAvailability(day, slot)}
+                                className={`w-full h-7 rounded-lg transition-colors ${form.availability[day].includes(slot) ? 'bg-primary' : 'bg-gray-100 hover:bg-gray-200'}`}
                               />
                             </td>
                           ))}
@@ -344,7 +427,7 @@ export default function RegisterTutorPage() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">Cliquez sur les cases pour indiquer vos créneaux disponibles (orange = disponible)</p>
+                <p className="text-xs text-gray-400 mt-2">Chaque case représente un créneau de 2h disponible (orange = disponible)</p>
               </div>
 
               <div className="flex gap-3">
@@ -372,77 +455,132 @@ export default function RegisterTutorPage() {
                 </p>
               </div>
 
-              {/* CNI */}
+              {/* ID type selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pièce d'identité (CNI / Passeport) *</label>
-                <input
-                  ref={cniInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  className="hidden"
-                  onChange={e => set('cniFile', e.target.files?.[0] || null)}
-                />
-                <button
-                  type="button"
-                  onClick={() => cniInputRef.current?.click()}
-                  className={`w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center gap-3 transition-all cursor-pointer ${
-                    form.cniFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
-                  }`}
-                >
-                  {form.cniFile ? (
-                    <>
-                      <FileText size={32} className="text-green-500" />
-                      <span className="text-sm font-medium text-green-700">{form.cniFile.name}</span>
-                      <span className="text-xs text-gray-400">Cliquez pour changer</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={32} className="text-gray-400" />
-                      <span className="text-sm font-medium text-gray-600">Cliquez pour sélectionner votre CNI</span>
-                      <span className="text-xs text-gray-400">JPG, PNG ou PDF — max 5 Mo</span>
-                    </>
-                  )}
-                </button>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type de pièce d'identité *</label>
+                <div className="flex gap-3">
+                  {[
+                    { value: 'cni', label: 'Carte Nationale d\'Identité' },
+                    { value: 'passport', label: 'Passeport' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => set('idType', opt.value)}
+                      className={`flex-1 p-3 rounded-xl border-2 text-sm font-medium transition-all ${form.idType === opt.value ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* CNI: recto + verso */}
+              {form.idType === 'cni' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">CNI — Recto & Verso *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FileUploadZone
+                      file={form.cniRectoFile}
+                      onFile={f => set('cniRectoFile', f)}
+                      label="Recto"
+                      inputRef={cniRectoRef}
+                    />
+                    <FileUploadZone
+                      file={form.cniVersoFile}
+                      onFile={f => set('cniVersoFile', f)}
+                      label="Verso"
+                      inputRef={cniVersoRef}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Passport */}
+              {form.idType === 'passport' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Passeport *</label>
+                  <FileUploadZone
+                    file={form.passportFile}
+                    onFile={f => set('passportFile', f)}
+                    label="Page principale du passeport"
+                    inputRef={passportRef}
+                  />
+                </div>
+              )}
 
               {/* Diplomas */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Diplôme(s) *</label>
-                <input
-                  ref={diplomaInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
-                  className="hidden"
-                  onChange={e => set('diplomaFile', e.target.files?.[0] || null)}
-                />
-                <button
-                  type="button"
-                  onClick={() => diplomaInputRef.current?.click()}
-                  className={`w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center gap-3 transition-all cursor-pointer ${
-                    form.diplomaFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
-                  }`}
-                >
-                  {form.diplomaFile ? (
-                    <>
-                      <FileText size={32} className="text-green-500" />
-                      <span className="text-sm font-medium text-green-700">{form.diplomaFile.name}</span>
-                      <span className="text-xs text-gray-400">Cliquez pour changer</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={32} className="text-gray-400" />
-                      <span className="text-sm font-medium text-gray-600">Cliquez pour sélectionner votre diplôme</span>
-                      <span className="text-xs text-gray-400">JPG, PNG ou PDF — max 5 Mo</span>
-                    </>
-                  )}
-                </button>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Diplôme(s) *</label>
+                  <button
+                    type="button"
+                    onClick={addDiploma}
+                    className="flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                  >
+                    <Plus size={14} /> Ajouter un diplôme
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  {form.diplomas.map((d, i) => {
+                    if (!diplomaRefs.current[i]) diplomaRefs.current[i] = { current: null }
+                    return (
+                      <div key={i} className="border border-gray-200 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-gray-700">Diplôme {i + 1}</p>
+                          {form.diplomas.length > 1 && (
+                            <button type="button" onClick={() => removeDiploma(i)} className="text-red-400 hover:text-red-600 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <input
+                            className="input-field"
+                            placeholder="Ex: Licence de Mathématiques — Université de Cocody"
+                            value={d.name}
+                            onChange={e => updateDiploma(i, 'name', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <input
+                            ref={el => { if (!diplomaRefs.current[i]) diplomaRefs.current[i] = {}; diplomaRefs.current[i].current = el }}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            className="hidden"
+                            onChange={e => updateDiploma(i, 'file', e.target.files?.[0] || null)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => diplomaRefs.current[i]?.current?.click()}
+                            className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center gap-3 transition-all cursor-pointer ${
+                              d.file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+                            }`}
+                          >
+                            {d.file ? (
+                              <>
+                                <FileText size={20} className="text-green-500 flex-shrink-0" />
+                                <span className="text-xs font-medium text-green-700 truncate">{d.file.name}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={20} className="text-gray-400 flex-shrink-0" />
+                                <span className="text-xs text-gray-500">Cliquez pour sélectionner le fichier (JPG, PNG, PDF — max 5 Mo)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
 
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="btn-outline flex-1">Retour</button>
                 <button
                   onClick={() => setStep(3)}
-                  disabled={!form.cniFile || !form.diplomaFile}
+                  disabled={!idDocReady || !diplomasReady}
                   className="btn-primary flex-1 disabled:opacity-50"
                 >
                   Continuer
@@ -461,9 +599,10 @@ export default function RegisterTutorPage() {
                   ['Ville', `${form.quartier ? form.quartier + ', ' : ''}${form.city}`],
                   ['Matières', form.subjects.join(', ')],
                   ['Niveaux', form.levels.join(', ')],
-                  ['Tarif mensuel', `${parseInt(form.monthlyRate || 0).toLocaleString('fr-FR')} FCFA/mois`],
+                  ['Tarif horaire', `${parseInt(form.monthlyRate || 0).toLocaleString('fr-FR')} FCFA/h`],
                   ['Modalités', form.modalities.map(m => ({ domicile_parent: 'Dom. parent', domicile_repetiteur: 'Dom. répétiteur', lieu_neutre: 'Lieu neutre', en_ligne: 'En ligne' })[m]).join(', ')],
-                  ['Documents', `${form.cniFile?.name || '—'} + ${form.diplomaFile?.name || '—'}`],
+                  ['Pièce d\'identité', form.idType === 'cni' ? 'CNI (recto + verso)' : 'Passeport'],
+                  ['Diplômes', form.diplomas.map(d => d.name || '—').join(', ')],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm">
                     <span className="text-gray-500">{k}</span>

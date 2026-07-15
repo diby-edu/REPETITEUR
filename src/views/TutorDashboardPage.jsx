@@ -74,7 +74,7 @@ export default function TutorDashboardPage() {
               </div>
             </div>
           </div>
-          <Link to={`/repetiteur/${tutor.id}`} className="btn-outline text-sm flex items-center gap-2">
+          <Link href={`/repetiteur/${tutor.id}`} className="btn-outline text-sm flex items-center gap-2">
             <Eye size={16} />
             Voir mon profil public
           </Link>
@@ -313,7 +313,7 @@ export default function TutorDashboardPage() {
                   return (
                     <Link
                       key={conv.id}
-                      to={`/messagerie/${conv.id}`}
+                      href={`/messagerie/${conv.id}`}
                       className={`flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors ${unreadInConv ? 'bg-primary-50' : ''}`}
                     >
                       <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">

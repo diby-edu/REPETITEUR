@@ -158,7 +158,10 @@ export default function RegisterTutorPage() {
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
 
   const toggleItem = (key, item) =>
-    set(key, form[key].includes(item) ? form[key].filter(x => x !== item) : [...form[key], item])
+    setForm(prev => ({
+      ...prev,
+      [key]: prev[key].includes(item) ? prev[key].filter(x => x !== item) : [...prev[key], item],
+    }))
 
   const toggleAvailability = (day, slot) => {
     const cur = form.availability[day]
@@ -655,9 +658,9 @@ export default function RegisterTutorPage() {
                 <p className="text-sm font-medium text-gray-700 mb-2">Modalités *</p>
                 <div className="grid grid-cols-2 gap-2">
                   {MODALITIES.map(m => (
-                    <button key={m.value} type="button" onClick={() => toggleItem('modalities', m.value)}
-                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm transition-all text-left ${form.modalities.includes(m.value) ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                      {MODALITY_ICONS[m.value]}
+                    <button key={m.id} type="button" onClick={() => toggleItem('modalities', m.id)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm transition-all text-left ${form.modalities.includes(m.id) ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {MODALITY_ICONS[m.id]}
                       {m.label}
                     </button>
                   ))}

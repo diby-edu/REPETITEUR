@@ -33,12 +33,11 @@ export default function HomePage() {
   const { currentUser, isAuthenticated } = useAuth()
   const [search, setSearch] = useState({ query: '', city: '' })
 
-  // Rediriger les utilisateurs déjà connectés vers leur espace
+  // Rediriger tuteurs et parents vers leur espace — l'admin peut rester sur la landing
   useEffect(() => {
-    if (!isAuthenticated || !currentUser) return
+    if (!isAuthenticated || !currentUser || currentUser.role === 'admin') return
     if (currentUser.role === 'tutor') router.replace('/tableau-de-bord/repetiteur')
     else if (currentUser.role === 'parent') router.replace('/tableau-de-bord/parent')
-    else if (currentUser.role === 'admin') router.replace('/admin')
   }, [isAuthenticated, currentUser, router])
 
   const activeTutors = getActiveTutors()

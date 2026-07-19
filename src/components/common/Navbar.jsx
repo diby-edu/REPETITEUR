@@ -54,8 +54,12 @@ export default function Navbar() {
     <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
-          {/* Logo — redirige vers le dashboard si connecté */}
-          <Link href={isAuthenticated ? getDashboardLink() : '/'} className="flex items-center gap-2 flex-shrink-0" onClick={() => setMenuOpen(false)}>
+          {/* Logo — admin → landing page ; autres → leur dashboard */}
+          <Link
+            href={!isAuthenticated ? '/' : currentUser?.role === 'admin' ? '/' : getDashboardLink()}
+            className="flex items-center gap-2 flex-shrink-0"
+            onClick={() => setMenuOpen(false)}
+          >
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <span className="text-white font-display font-bold text-lg">M</span>
             </div>

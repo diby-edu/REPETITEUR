@@ -281,9 +281,15 @@ export default function TutorDashboardPage() {
                 <StatusBadge status={tutor.verificationStatus} />
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">CNI</span>
-                <span className={`text-sm font-medium ${tutor.documents?.cni ? 'text-green-600' : 'text-red-500'}`}>
-                  {tutor.documents?.cni ? '✓ Soumise' : '✗ Manquante'}
+                <span className="text-sm text-gray-500">
+                  {tutor.documents?.idType === 'passport' ? 'Passeport' : 'CNI'}
+                </span>
+                <span className={`text-sm font-medium ${
+                  (tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni)
+                    ? 'text-green-600' : 'text-red-500'
+                }`}>
+                  {(tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni)
+                    ? '✓ Soumise' : '✗ Manquante'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -292,6 +298,12 @@ export default function TutorDashboardPage() {
                   {tutor.documents?.diplomes?.length ? `✓ ${tutor.documents.diplomes.length} soumis` : '✗ Manquant'}
                 </span>
               </div>
+              {tutor.documents?.selfiePath && (
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Selfie</span>
+                  <span className="text-sm font-medium text-green-600">✓ Soumis</span>
+                </div>
+              )}
               {tutor.verificationStatus === 'verified' && (
                 <div className="bg-green-50 rounded-xl p-3 flex items-center gap-2">
                   <CheckCircle size={16} className="text-green-500" />
@@ -353,17 +365,26 @@ export default function TutorDashboardPage() {
                 {conversations.slice(0, 3).map(conv => {
                   const otherUserId = conv.participants.find(p => p !== tutor.id)
                   const unreadInConv = conv.unreadCount[tutor.id] || 0
+                  const parent = matchingParents.find(p => p.id === otherUserId)
+                  const initials = parent
+                    ? `${parent.firstName?.[0] || ''}${parent.lastName?.[0] || ''}`
+                    : '?'
+                  const name = parent ? `${parent.firstName} ${parent.lastName?.[0]}.` : 'Utilisateur'
                   return (
                     <Link
                       key={conv.id}
                       href={`/messagerie/${conv.id}`}
                       className={`flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors ${unreadInConv ? 'bg-primary-50' : ''}`}
                     >
-                      <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0">
-                        {otherUserId.slice(0, 1).toUpperCase()}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                        style={{ backgroundColor: parent?.avatarColor || '#16A085' }}
+                      >
+                        {initials}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate ${unreadInConv ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        <p className={`text-sm font-medium text-gray-800`}>{name}</p>
+                        <p className={`text-xs truncate ${unreadInConv ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
                           {conv.lastMessage?.content || 'Nouvelle conversation'}
                         </p>
                       </div>

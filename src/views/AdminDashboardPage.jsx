@@ -328,6 +328,18 @@ export default function AdminDashboardPage() {
                           <span className="text-gray-600">CNI soumise</span>
                         </div>
                       )}
+                      {/* Selfie */}
+                      {tutor.documents?.selfiePath && (
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-green-400" />
+                            <span className="text-gray-600">Selfie avec pièce</span>
+                          </div>
+                          <button onClick={() => viewDocument(tutor.documents.selfiePath)} className="flex items-center gap-1 text-primary hover:underline">
+                            <ExternalLink size={11} /> Voir
+                          </button>
+                        </div>
+                      )}
                       {/* Diplômes */}
                       {(tutor.documents?.diplomes || []).map((d, i) => (
                         <div key={i} className="flex items-center justify-between gap-2 text-xs">

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
+import { useChatBubble } from '../context/ChatBubbleContext'
 import { supabase } from '../lib/supabase'
 import Avatar from '../components/common/Avatar'
 import StarRating from '../components/common/StarRating'
@@ -24,6 +25,7 @@ export default function TutorDashboardPage() {
     getOrCreateConversation,
   } = useApp()
 
+  const { openChat } = useChatBubble()
   const tutor = currentUser
   const [matchingParents, setMatchingParents] = useState([])
   const [contactingId, setContactingId] = useState(null)
@@ -71,7 +73,7 @@ export default function TutorDashboardPage() {
     setContactingId(parentId)
     const conv = await getOrCreateConversation(tutor.id, parentId)
     setContactingId(null)
-    if (conv) router.push(`/messagerie/${conv.id}`)
+    if (conv) openChat(conv.id)
   }
 
   const conversations = getUserConversations(tutor.id)
@@ -203,9 +205,9 @@ export default function TutorDashboardPage() {
                   {unreadMessages} message{unreadMessages > 1 ? 's' : ''} non lu{unreadMessages > 1 ? 's' : ''}
                 </p>
               </div>
-              <Link href="/messagerie" className="text-xs font-semibold text-primary bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg border border-primary/20">
+              <button onClick={() => openChat()} className="text-xs font-semibold text-primary bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg border border-primary/20">
                 Voir
-              </Link>
+              </button>
             </div>
           )}
         </div>
@@ -354,9 +356,9 @@ export default function TutorDashboardPage() {
                 <MessageCircle size={18} className="text-primary" />
                 Messages récents
               </h2>
-              <Link href="/messagerie" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+              <button onClick={() => openChat()} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
                 Voir tout <ChevronRight size={12} />
-              </Link>
+              </button>
             </div>
             {conversations.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-6">Aucun message</p>
@@ -371,10 +373,10 @@ export default function TutorDashboardPage() {
                     : '?'
                   const name = parent ? `${parent.firstName} ${parent.lastName?.[0]}.` : 'Utilisateur'
                   return (
-                    <Link
+                    <button
                       key={conv.id}
-                      href={`/messagerie/${conv.id}`}
-                      className={`flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors ${unreadInConv ? 'bg-primary-50' : ''}`}
+                      onClick={() => openChat(conv.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left ${unreadInConv ? 'bg-primary-50' : ''}`}
                     >
                       <div
                         className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
@@ -393,7 +395,7 @@ export default function TutorDashboardPage() {
                           {unreadInConv}
                         </span>
                       )}
-                    </Link>
+                    </button>
                   )
                 })}
               </div>

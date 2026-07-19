@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
+import { useChatBubble } from '../context/ChatBubbleContext'
 import Avatar from '../components/common/Avatar'
 import TutorCard from '../components/common/TutorCard'
 import { StatusBadge } from '../components/common/Badge'
@@ -20,6 +21,7 @@ export default function ParentDashboardPage() {
     loadUserNotifications, subscribeToNotifications, getTutor,
   } = useApp()
 
+  const { openChat } = useChatBubble()
   const parent = currentUser
 
   useEffect(() => {
@@ -74,9 +76,9 @@ export default function ParentDashboardPage() {
             <p className="text-sm font-medium text-primary-700 flex-1">
               {unreadMessages} nouveau{unreadMessages > 1 ? 'x' : ''} message{unreadMessages > 1 ? 's' : ''}
             </p>
-            <Link href="/messagerie" className="text-xs text-primary font-semibold bg-white px-3 py-1.5 rounded-lg border border-primary/20">
+            <button onClick={() => openChat()} className="text-xs text-primary font-semibold bg-white px-3 py-1.5 rounded-lg border border-primary/20">
               Voir
-            </Link>
+            </button>
           </div>
         )}
 
@@ -139,9 +141,9 @@ export default function ParentDashboardPage() {
                 <MessageCircle size={18} className="text-primary" />
                 Messages récents
               </h2>
-              <Link href="/messagerie" className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+              <button onClick={() => openChat()} className="text-xs text-primary font-medium hover:underline flex items-center gap-1">
                 Voir tout <ChevronRight size={12} />
-              </Link>
+              </button>
             </div>
             {conversations.length === 0 ? (
               <div className="text-center py-8">
@@ -158,10 +160,10 @@ export default function ParentDashboardPage() {
                   const t = getTutor(tutorId)
                   const unreadInConv = conv.unreadCount[parent.id] || 0
                   return (
-                    <Link
+                    <button
                       key={conv.id}
-                      href={`/messagerie/${conv.id}`}
-                      className={`flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors ${unreadInConv ? 'bg-primary-50' : ''}`}
+                      onClick={() => openChat(conv.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left ${unreadInConv ? 'bg-primary-50' : ''}`}
                     >
                       <Avatar user={t} size="sm" />
                       <div className="flex-1 min-w-0">
@@ -175,7 +177,7 @@ export default function ParentDashboardPage() {
                           {unreadInConv}
                         </span>
                       )}
-                    </Link>
+                    </button>
                   )
                 })}
               </div>

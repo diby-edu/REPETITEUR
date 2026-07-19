@@ -255,7 +255,15 @@ export default function RegisterTutorPage() {
     })
     setLoading(false)
 
-    if (err) { setError(err.message); return }
+    if (err) {
+      const msg = err.message
+      if (!msg || msg === '{}') setError('Erreur lors de la création du compte. Réessayez.')
+      else if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) setError('Cet email est déjà utilisé. Connectez-vous plutôt.')
+      else if (msg.toLowerCase().includes('rate limit')) setError('Trop de tentatives. Attendez quelques minutes.')
+      else if (msg.toLowerCase().includes('invalid email')) setError('Adresse email invalide.')
+      else setError(msg)
+      return
+    }
     if (!data.user) { setError('Erreur inattendue. Réessayez.'); return }
 
     setPendingEmail(form.email)

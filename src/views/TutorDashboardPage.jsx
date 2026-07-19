@@ -14,6 +14,7 @@ import {
   Check, X,
 } from 'lucide-react'
 import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -187,10 +188,10 @@ export default function TutorDashboardPage() {
   const hasId             = tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni
 
   const stats = [
-    { label: 'Vues ce mois',      value: tutor.profileViews || 0,      icon: <Eye size={20} />,         color: 'bg-blue-50 text-blue-600' },
-    { label: 'Contrats actifs',   value: activeEngagements.length,      icon: <FileText size={20} />,    color: 'bg-secondary-50 text-secondary' },
-    { label: 'Séances ce mois',   value: monthSessionCount,             icon: <CheckCircle size={20} />, color: 'bg-green-50 text-green-600' },
-    { label: 'Note moyenne',      value: tutor.rating > 0 ? `${tutor.rating.toFixed(1)}★` : '—', icon: <Star size={20} />, color: 'bg-yellow-50 text-yellow-600' },
+    { label: 'Vues ce mois',    value: tutor.profileViews || 0,      icon: <Eye size={20} />,         color: 'bg-blue-50 text-blue-600',         bar: 'bg-blue-500' },
+    { label: 'Contrats actifs', value: activeEngagements.length,      icon: <FileText size={20} />,    color: 'bg-secondary-50 text-secondary',   bar: 'bg-secondary' },
+    { label: 'Séances ce mois', value: monthSessionCount,             icon: <CheckCircle size={20} />, color: 'bg-green-50 text-green-600',       bar: 'bg-green-500' },
+    { label: 'Note moyenne',    value: tutor.rating > 0 ? `${tutor.rating.toFixed(1)}★` : '—', icon: <Star size={20} />, color: 'bg-yellow-50 text-yellow-600', bar: 'bg-accent' },
   ]
 
   const PAY_LABELS = { cash: 'Cash', orange_money: 'Orange Money', wave: 'Wave', mtn_money: 'MTN Money' }
@@ -198,8 +199,8 @@ export default function TutorDashboardPage() {
   // ── Render ───────────────────────────────────────────────────
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <DashboardLayout>
+      <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
@@ -324,13 +325,14 @@ export default function TutorDashboardPage() {
           )}
         </div>
 
-        {/* Stats */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((s, i) => (
-            <div key={i} className="card">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
-              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+            <div key={i} className="card relative overflow-hidden">
+              <div className={`absolute top-0 left-0 right-0 h-0.5 ${s.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{s.label}</p>
             </div>
           ))}
         </div>
@@ -711,6 +713,6 @@ export default function TutorDashboardPage() {
           </div>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   )
 }

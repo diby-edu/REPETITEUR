@@ -11,6 +11,7 @@ import {
   BarChart3, FileText, ExternalLink, Wallet,
 } from 'lucide-react'
 import { formatDateShort, formatFCFA } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats']
 const TODAY = new Date().toISOString().split('T')[0]
@@ -130,15 +131,15 @@ export default function AdminDashboardPage() {
   const totalSessions    = sessionStats.upcoming + sessionStats.toConfirm + sessionStats.reported
 
   const stats = [
-    { label: 'Répétiteurs inscrits', value: tutors.length,              icon: <GraduationCap size={20} />, color: 'bg-primary-50 text-primary',    sub: `${verified.length} vérifiés` },
-    { label: 'Parents inscrits',     value: parents.length,             icon: <Users size={20} />,         color: 'bg-secondary-50 text-secondary', sub: 'Accès gratuit' },
-    { label: 'Contrats actifs',      value: engStats.active,            icon: <FileText size={20} />,      color: 'bg-green-50 text-green-600',    sub: `${engStats.pending} en attente` },
-    { label: 'Abonnements actifs',   value: activeSubscriptions.length, icon: <TrendingUp size={20} />,    color: 'bg-accent-50 text-accent',      sub: `${premiumSubs.length} Premium` },
+    { label: 'Répétiteurs inscrits', value: tutors.length,              icon: <GraduationCap size={20} />, color: 'bg-primary-50 text-primary',    sub: `${verified.length} vérifiés`,           bar: 'bg-primary' },
+    { label: 'Parents inscrits',     value: parents.length,             icon: <Users size={20} />,         color: 'bg-secondary-50 text-secondary', sub: 'Accès gratuit',                         bar: 'bg-secondary' },
+    { label: 'Contrats actifs',      value: engStats.active,            icon: <FileText size={20} />,      color: 'bg-green-50 text-green-600',    sub: `${engStats.pending} en attente`,        bar: 'bg-green-500' },
+    { label: 'Abonnements actifs',   value: activeSubscriptions.length, icon: <TrendingUp size={20} />,    color: 'bg-accent-50 text-accent',      sub: `${premiumSubs.length} Premium`,         bar: 'bg-accent' },
   ]
 
   // ── Render ───────────────────────────────────────────────────
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
 
       {/* Reject modal */}
       {rejectModal && (
@@ -170,7 +171,7 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="font-display text-2xl font-bold text-gray-900">Tableau de bord Admin</h1>
@@ -192,14 +193,15 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, i) => (
-            <div key={i} className="card">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>{stat.icon}</div>
-              <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{stat.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>
+            <div key={i} className="card relative overflow-hidden">
+              <div className={`absolute top-0 left-0 right-0 h-0.5 ${stat.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>{stat.icon}</div>
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{stat.label}</p>
+              {stat.sub && <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>}
             </div>
           ))}
         </div>
@@ -646,6 +648,6 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

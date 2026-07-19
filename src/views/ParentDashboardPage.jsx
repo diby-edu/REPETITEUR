@@ -4,13 +4,16 @@ import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { useChatBubble } from '../context/ChatBubbleContext'
+import { supabase } from '../lib/supabase'
 import Avatar from '../components/common/Avatar'
 import TutorCard from '../components/common/TutorCard'
 import {
   Calendar, MessageCircle, Heart, Search, Clock,
   FileText, AlertCircle, ChevronRight, BookOpen,
+  Users, Send, MapPin, Star,
 } from 'lucide-react'
 import { formatFCFA } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -52,8 +55,8 @@ export default function ParentDashboardPage() {
     getUserConversations, getUserEngagements, getAllUserSessions,
     loadUserConversations, loadUserEngagements, loadAllUserSessions,
     loadUserFavorites, getUserFavorites, loadUserNotifications,
-    subscribeToNotifications, getTutor, reportSession, declarePayment,
-    runMaintenanceTasks,
+    subscribeToNotifications, getTutor, getOrCreateConversation,
+    reportSession, declarePayment, runMaintenanceTasks,
   } = useApp()
   const { openChat } = useChatBubble()
   const parent = currentUser
@@ -66,6 +69,10 @@ export default function ParentDashboardPage() {
   const [ratingComment, setRatingComment] = useState('')
   const [reportConfirm, setReportConfirm] = useState(false)
   const [reportLoading, setReportLoading] = useState(false)
+
+  // ── Répétiteurs disponibles ─────────────────────────────────
+  const [matchingTutors, setMatchingTutors] = useState([])
+  const [contactingId, setContactingId]     = useState(null)
 
   // ── Payment declaration modal ───────────────────────────────
   const [declaringEng, setDeclaringEng]   = useState(null)
@@ -84,6 +91,37 @@ export default function ParentDashboardPage() {
     runMaintenanceTasks()
     return subscribeToNotifications(parent.id)
   }, [parent?.id])
+
+  // Répétiteurs vérifiés dans la même ville
+  useEffect(() => {
+    if (!parent?.city) return
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, city, avatar_color, tutors(subjects, levels, monthly_rate, rating, is_active, verification_status)')
+      .eq('role', 'tutor')
+      .eq('city', parent.city)
+      .order('join_date', { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (!data) return
+        let list = data.filter(p => p.tutors?.is_active && p.tutors?.verification_status === 'verified')
+        if (parent.subjectsNeeded?.length) {
+          list = list.filter(t => !t.tutors?.subjects?.length || t.tutors.subjects.some(s => parent.subjectsNeeded.includes(s)))
+        }
+        list.sort((a, b) => (b.tutors?.rating || 0) - (a.tutors?.rating || 0))
+        setMatchingTutors(list.slice(0, 12).map(p => ({
+          id: p.id,
+          firstName: p.first_name,
+          lastName: p.last_name,
+          city: p.city,
+          avatarColor: p.avatar_color,
+          subjects: p.tutors?.subjects || [],
+          levels: p.tutors?.levels || [],
+          monthlyRate: p.tutors?.monthly_rate,
+          rating: p.tutors?.rating,
+        })))
+      })
+  }, [parent?.city])
 
   const conversations  = getUserConversations(parent.id)
   const engagements    = getUserEngagements(parent.id, 'parent')
@@ -111,10 +149,10 @@ export default function ParentDashboardPage() {
   })
 
   const stats = [
-    { label: 'Contrats actifs',       value: activeEngagements.length,     icon: <FileText size={20} />,     color: 'bg-secondary-50 text-secondary' },
-    { label: 'Séances à confirmer',   value: sessionsToReport.length,       icon: <Clock size={20} />,        color: sessionsToReport.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-400' },
-    { label: 'Cette semaine',          value: thisWeekSessions.length,       icon: <Calendar size={20} />,     color: 'bg-primary-50 text-primary' },
-    { label: 'Répétiteurs favoris',   value: favoriteTutors.length,         icon: <Heart size={20} />,        color: 'bg-red-50 text-red-500' },
+    { label: 'Contrats actifs',     value: activeEngagements.length,  icon: <FileText size={20} />,  color: 'bg-secondary-50 text-secondary',                                                                            bar: 'bg-secondary' },
+    { label: 'Séances à confirmer', value: sessionsToReport.length,   icon: <Clock size={20} />,     color: sessionsToReport.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-400', bar: sessionsToReport.length > 0 ? 'bg-orange-500' : 'bg-gray-300' },
+    { label: 'Cette semaine',       value: thisWeekSessions.length,   icon: <Calendar size={20} />,  color: 'bg-primary-50 text-primary',                                                                                bar: 'bg-primary' },
+    { label: 'Répétiteurs favoris', value: favoriteTutors.length,     icon: <Heart size={20} />,     color: 'bg-red-50 text-red-500',                                                                                    bar: 'bg-red-500' },
   ]
 
   // ── Handlers ────────────────────────────────────────────────
@@ -151,13 +189,21 @@ export default function ParentDashboardPage() {
     setDeclaringEng(null)
   }
 
+  const handleContactTutor = async (tutorId) => {
+    if (contactingId) return
+    setContactingId(tutorId)
+    const conv = await getOrCreateConversation(parent.id, tutorId)
+    setContactingId(null)
+    if (conv) openChat(conv.id)
+  }
+
   const PAY_METHODS = { cash: 'Cash', orange_money: 'Orange Money', wave: 'Wave', mtn_money: 'MTN Money' }
 
   // ── Render ──────────────────────────────────────────────────
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <DashboardLayout>
+      <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
@@ -219,13 +265,14 @@ export default function ParentDashboardPage() {
           )}
         </div>
 
-        {/* Stats */}
+        {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((s, i) => (
-            <div key={i} className="card">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
-              <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+            <div key={i} className="card relative overflow-hidden">
+              <div className={`absolute top-0 left-0 right-0 h-0.5 ${s.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
+              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
+              <p className="text-xs text-gray-500 mt-1 font-medium">{s.label}</p>
             </div>
           ))}
         </div>
@@ -422,6 +469,93 @@ export default function ParentDashboardPage() {
             </Link>
           </div>
         )}
+
+        {/* Répétiteurs disponibles */}
+        <div className="mt-6">
+          <div className="mb-4">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Users size={18} className="text-secondary" />
+              Répétiteurs disponibles à {parent.city}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {matchingTutors.length > 0
+                ? `${matchingTutors.length} répétiteur${matchingTutors.length > 1 ? 's' : ''} correspond${matchingTutors.length > 1 ? 'ent' : ''} à votre recherche`
+                : "Aucun répétiteur correspondant pour l'instant"}
+            </p>
+          </div>
+
+          {matchingTutors.length === 0 ? (
+            <div className="card text-center py-10">
+              <Users size={40} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Aucun répétiteur vérifié dans votre ville pour l'instant.</p>
+              <Link href="/recherche" className="text-xs text-primary font-medium mt-2 inline-block hover:underline">
+                Recherche avancée →
+              </Link>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {matchingTutors.map(t => (
+                <div key={t.id} className="card flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                      style={{ backgroundColor: t.avatarColor || '#E87722' }}
+                    >
+                      {t.firstName?.[0]}{t.lastName?.[0]}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">{t.firstName} {t.lastName}</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={11} /> {t.city}</p>
+                    </div>
+                    {t.rating > 0 && (
+                      <div className="flex items-center gap-1 text-accent text-xs font-semibold flex-shrink-0">
+                        <Star size={12} fill="currentColor" /> {t.rating?.toFixed(1)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {t.monthlyRate > 0 && (
+                      <p className="text-xs text-gray-600 font-medium">{formatFCFA(t.monthlyRate)} / mois</p>
+                    )}
+                    {t.subjects?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {t.subjects.slice(0, 3).map(s => (
+                          <span
+                            key={s}
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}
+                          >
+                            {s}
+                          </span>
+                        ))}
+                        {t.subjects.length > 3 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-auto flex gap-2">
+                    <Link
+                      href={`/repetiteur/${t.id}`}
+                      className="btn-outline text-xs py-2 flex-1 text-center"
+                    >
+                      Profil
+                    </Link>
+                    <button
+                      onClick={() => handleContactTutor(t.id)}
+                      disabled={contactingId === t.id}
+                      className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {contactingId === t.id
+                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        : <Send size={13} />}
+                      Contacter
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Modal rapport de séance ─────────────────────────────── */}
@@ -609,6 +743,6 @@ export default function ParentDashboardPage() {
           </div>
         )
       })()}
-    </div>
+    </DashboardLayout>
   )
 }

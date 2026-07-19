@@ -1,0 +1,135 @@
+'use client'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '../../context/AuthContext'
+import { useApp } from '../../context/AppContext'
+import Avatar from '../common/Avatar'
+import {
+  LayoutDashboard, Calendar, MessageCircle, Heart, Search,
+  Settings, BookOpen, Bell, LogOut, Users, ShieldCheck,
+} from 'lucide-react'
+
+const NAV = {
+  tutor: [
+    { label: 'Tableau de bord', href: '/tableau-de-bord/repetiteur', icon: LayoutDashboard },
+    { label: 'Séances',         href: '/reservations',               icon: Calendar },
+    { label: 'Messages',        href: '/messagerie',                 icon: MessageCircle },
+    { label: 'Abonnement',      href: '/abonnement',                 icon: BookOpen },
+    { label: 'Paramètres',      href: '/parametres',                 icon: Settings },
+  ],
+  parent: [
+    { label: 'Tableau de bord',       href: '/tableau-de-bord/parent', icon: LayoutDashboard },
+    { label: 'Trouver un répétiteur', href: '/recherche',              icon: Search },
+    { label: 'Séances',               href: '/reservations',           icon: Calendar },
+    { label: 'Messages',              href: '/messagerie',             icon: MessageCircle },
+    { label: 'Favoris',               href: '/favoris',               icon: Heart },
+    { label: 'Paramètres',            href: '/parametres',            icon: Settings },
+  ],
+  admin: [
+    { label: 'Tableau de bord', href: '/admin',      icon: LayoutDashboard },
+    { label: 'Utilisateurs',    href: '/admin',      icon: Users },
+    { label: 'Vérifications',   href: '/admin',      icon: ShieldCheck },
+    { label: 'Paramètres',      href: '/parametres', icon: Settings },
+  ],
+}
+
+const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Administrateur' }
+
+export default function DashboardSidebar() {
+  const { currentUser, logout } = useAuth()
+  const { getUnreadNotifCount } = useApp()
+  const pathname = usePathname()
+  const router   = useRouter()
+
+  if (!currentUser) return null
+
+  const role       = currentUser.role
+  const items      = NAV[role] || []
+  const unreadN    = getUnreadNotifCount(currentUser.id)
+
+  const isActive = (href) => pathname === href
+
+  const handleLogout = () => { logout(); router.push('/') }
+
+  return (
+    <aside
+      className="w-60 flex-shrink-0 flex flex-col h-full overflow-y-auto z-10"
+      style={{ background: 'linear-gradient(180deg, #1B4332 0%, #2D6A4F 100%)' }}
+    >
+      {/* Logo */}
+      <div className="px-5 pt-5 pb-4 border-b border-white/10 flex-shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-display font-bold text-base">M</span>
+          </div>
+          <span className="font-display font-bold text-[15px] text-white">
+            Mon<span className="text-accent-400">Répétiteur</span>
+          </span>
+        </Link>
+      </div>
+
+      {/* User profile */}
+      <div className="px-4 py-4 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Avatar user={currentUser} size="md" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-white truncate leading-tight">
+              {currentUser.firstName} {currentUser.lastName}
+            </p>
+            <p className="text-xs text-white/55 mt-0.5 truncate">{currentUser.city || 'Côte d\'Ivoire'}</p>
+            <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mt-1.5 bg-white/15 text-white/85">
+              {ROLE_LABELS[role]}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav items */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {items.map(({ label, href, icon: Icon }) => (
+          <Link
+            key={href + label}
+            href={href}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              isActive(href)
+                ? 'bg-white/22 text-white shadow-sm'
+                : 'text-white/60 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <Icon size={17} className="flex-shrink-0" />
+            {label}
+          </Link>
+        ))}
+
+        {/* Notifications */}
+        <Link
+          href="/notifications"
+          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            isActive('/notifications')
+              ? 'bg-white/22 text-white'
+              : 'text-white/60 hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          <Bell size={17} className="flex-shrink-0" />
+          Notifications
+          {unreadN > 0 && (
+            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+              {unreadN > 9 ? '9+' : unreadN}
+            </span>
+          )}
+        </Link>
+      </nav>
+
+      {/* Logout */}
+      <div className="flex-shrink-0 px-3 pt-3 pb-5 border-t border-white/10">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-white/55 hover:text-white hover:bg-white/10 transition-all"
+        >
+          <LogOut size={17} className="flex-shrink-0" />
+          Déconnexion
+        </button>
+      </div>
+    </aside>
+  )
+}

@@ -64,7 +64,7 @@ function FileUploadZone({ file, onFile, inputRef, label }) {
 
 function OtpInput({ value, onChange }) {
   const refs = useRef([])
-  const len = 6
+  const len = 8
   const chars = value.padEnd(len, ' ').split('').slice(0, len)
 
   const update = (i, char) => {
@@ -276,7 +276,7 @@ export default function RegisterTutorPage() {
 
   const handleVerifyOtp = async () => {
     setError('')
-    if (otpCode.replace(/\s/g, '').length !== 6) { setError('Entrez les 6 chiffres du code.'); return }
+    if (otpCode.replace(/\s/g, '').length !== 8) { setError('Entrez les 8 chiffres du code.'); return }
 
     setLoading(true)
     const result = await verifyOtp(pendingEmail, otpCode)
@@ -543,7 +543,7 @@ export default function RegisterTutorPage() {
 
               <button
                 onClick={handleVerifyOtp}
-                disabled={loading || otpCode.length < 6}
+                disabled={loading || otpCode.replace(/\s/g,'').length < 8}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Vérifier le code'}

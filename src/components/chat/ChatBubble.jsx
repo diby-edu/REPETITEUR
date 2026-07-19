@@ -22,31 +22,54 @@ export default function ChatBubble() {
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
 
-  // Pas de bulle si non connecté
-  if (!isAuthenticated || !currentUser) return null
-
-  const conversations = getUserConversations(currentUser.id)
-  const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount?.[currentUser.id] || 0), 0)
+  // Valeurs dérivées — null-safe pour fonctionner avant et après connexion
+  const conversations = isAuthenticated && currentUser
+    ? getUserConversations(currentUser.id)
+    : []
+  const totalUnread = conversations.reduce(
+    (sum, c) => sum + (c.unreadCount?.[currentUser?.id] || 0), 0
+  )
   const activeConv = activeConvId ? getConversation(activeConvId) : null
   const messages = activeConv?.messages || []
   const otherUser = activeConv
-    ? otherUserCache[activeConv.participants?.find(p => p !== currentUser.id)]
+    ? otherUserCache[activeConv.participants?.find(p => p !== currentUser?.id)]
     : null
 
-  // Charger les conversations quand la bulle s'ouvre
+  // ── Tous les hooks AVANT le return conditionnel ───────────────
+
+  const resolveOtherUser = useCallback(async (conv) => {
+    if (!currentUser?.id) return
+    const otherId = conv?.participants?.find(p => p !== currentUser.id)
+    if (!otherId || otherUserCache[otherId]) return
+    const tutor = getTutor(otherId)
+    if (tutor) { setOtherUserCache(prev => ({ ...prev, [otherId]: tutor })); return }
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, role, avatar_color')
+      .eq('id', otherId)
+      .single()
+    if (data) {
+      setOtherUserCache(prev => ({
+        ...prev,
+        [otherId]: {
+          id: data.id, firstName: data.first_name, lastName: data.last_name,
+          role: data.role, avatarColor: data.avatar_color,
+        },
+      }))
+    }
+  }, [currentUser?.id, getTutor, otherUserCache])
+
   useEffect(() => {
     if (isOpen && currentUser?.id) loadUserConversations(currentUser.id)
   }, [isOpen, currentUser?.id, loadUserConversations])
 
-  // Charger les messages et marquer comme lus quand une conv est ouverte
   useEffect(() => {
-    if (activeConvId && isOpen) {
+    if (activeConvId && isOpen && currentUser?.id) {
       loadMessages(activeConvId)
       markConversationRead(activeConvId, currentUser.id)
     }
-  }, [activeConvId, isOpen])
+  }, [activeConvId, isOpen, currentUser?.id])
 
-  // Realtime — nouveaux messages dans la conversation active
   useEffect(() => {
     if (!activeConvId || !isOpen) return
     const channel = supabase
@@ -61,42 +84,24 @@ export default function ChatBubble() {
     return () => supabase.removeChannel(channel)
   }, [activeConvId, isOpen])
 
-  // Scroll vers le dernier message
   useEffect(() => {
     if (isOpen && activeConvId) {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
     }
   }, [messages.length, activeConvId, isOpen])
 
-  // Focus le champ quand on entre dans une conv
   useEffect(() => {
     if (isOpen && activeConvId) {
       setTimeout(() => inputRef.current?.focus(), 150)
     }
   }, [activeConvId, isOpen])
 
-  // Résoudre les profils des autres participants (cache)
-  const resolveOtherUser = useCallback(async (conv) => {
-    const otherId = conv?.participants?.find(p => p !== currentUser.id)
-    if (!otherId || otherUserCache[otherId]) return
-    const tutor = getTutor(otherId)
-    if (tutor) { setOtherUserCache(prev => ({ ...prev, [otherId]: tutor })); return }
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, role, avatar_color')
-      .eq('id', otherId)
-      .single()
-    if (data) {
-      setOtherUserCache(prev => ({
-        ...prev,
-        [otherId]: { id: data.id, firstName: data.first_name, lastName: data.last_name, role: data.role, avatarColor: data.avatar_color },
-      }))
-    }
-  }, [currentUser.id, getTutor, otherUserCache])
-
   useEffect(() => {
     conversations.forEach(conv => resolveOtherUser(conv))
   }, [conversations.length])
+
+  // ── Guard — pas de bulle si non connecté (après tous les hooks) ─
+  if (!isAuthenticated || !currentUser) return null
 
   const handleSend = async (e) => {
     e?.preventDefault()

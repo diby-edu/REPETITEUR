@@ -130,11 +130,12 @@ export default function AdminDashboardPage() {
   const totalEngagements = engStats.pending + engStats.active + engStats.ended
   const totalSessions    = sessionStats.upcoming + sessionStats.toConfirm + sessionStats.reported
 
+  const totalMonthlyRevenue = (standardSubs.length * 3000) + (premiumSubs.length * 5000)
   const stats = [
-    { label: 'Répétiteurs inscrits', value: tutors.length,              icon: <GraduationCap size={20} />, color: 'bg-primary-50 text-primary',    sub: `${verified.length} vérifiés`,           bar: 'bg-primary' },
-    { label: 'Parents inscrits',     value: parents.length,             icon: <Users size={20} />,         color: 'bg-secondary-50 text-secondary', sub: 'Accès gratuit',                         bar: 'bg-secondary' },
-    { label: 'Contrats actifs',      value: engStats.active,            icon: <FileText size={20} />,      color: 'bg-green-50 text-green-600',    sub: `${engStats.pending} en attente`,        bar: 'bg-green-500' },
-    { label: 'Abonnements actifs',   value: activeSubscriptions.length, icon: <TrendingUp size={20} />,    color: 'bg-accent-50 text-accent',      sub: `${premiumSubs.length} Premium`,         bar: 'bg-accent' },
+    { label: 'Répétiteurs actifs', value: verified.length,             emoji: '🎓', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: `${tutors.length} inscrits · ${pending.length} en attente`, deltaClass: 'text-gray-400' },
+    { label: 'Parents inscrits',   value: parents.length,              emoji: '👨‍👩‍👧', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '↑ en hausse ce mois',                                    deltaClass: 'text-green-600' },
+    { label: 'Séances ce mois',    value: totalSessions,               emoji: '📅', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionStats.toConfirm > 0 ? `${sessionStats.toConfirm} à confirmer` : '→ stable', deltaClass: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-400' },
+    { label: 'CA FCFA (mois)',     value: totalMonthlyRevenue > 0 ? totalMonthlyRevenue.toLocaleString('fr-FR') : '0', emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: totalMonthlyRevenue >= 100000, delta: `${activeSubscriptions.length} abonnements actifs`, deltaClass: 'text-green-600' },
   ]
 
   // ── Render ───────────────────────────────────────────────────
@@ -172,38 +173,89 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="font-display text-2xl font-bold text-gray-900">Tableau de bord Admin</h1>
-            <p className="text-gray-500 text-sm mt-1">MonRépétiteur — Administration</p>
+            <h1 className="font-display text-xl font-bold text-gray-900">Administration 🛡️</h1>
+            <p className="text-gray-400 text-sm mt-0.5">
+              MonRépétiteur · Tableau de bord · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            {pending.length > 0 && (
-              <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-xl text-sm font-medium">
-                <AlertTriangle size={16} />
-                {pending.length} dossier{pending.length > 1 ? 's' : ''} en attente
-              </div>
-            )}
-            {payStats.pendingDecl > 0 && (
-              <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-800 px-4 py-2 rounded-xl text-sm font-medium">
-                <Wallet size={16} />
-                {payStats.pendingDecl} paiement{payStats.pendingDecl > 1 ? 's' : ''} à confirmer
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <button className="btn-outline text-sm">Exporter CSV</button>
+            <button className="btn-outline text-sm">Paramètres</button>
           </div>
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((stat, i) => (
-            <div key={i} className="card relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-0.5 ${stat.bar}`} />
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${stat.color}`}>{stat.icon}</div>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{stat.value}</p>
-              <p className="text-xs text-gray-500 mt-1 font-medium">{stat.label}</p>
-              {stat.sub && <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>}
+            <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
+              <div className={`absolute top-0 left-0 right-0 h-[3px] ${stat.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${stat.bg}`}>{stat.emoji}</div>
+              <div className="min-w-0">
+                <p className={`font-black text-gray-900 tabular-nums leading-none ${stat.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{stat.value}</p>
+                <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{stat.label}</p>
+                {stat.delta && <p className={`text-[10px] font-bold mt-1 ${stat.deltaClass}`}>{stat.delta}</p>}
+              </div>
             </div>
           ))}
+        </div>
+
+        {/* Actions requises + Cette semaine */}
+        <div className="grid md:grid-cols-2 gap-5 mb-6">
+          {/* Actions requises */}
+          <div className="card border-orange-200 bg-orange-50/20">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900">⚠️ Actions requises</h2>
+              {(pending.length + sessionStats.toConfirm) > 0 && (
+                <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">{pending.length + sessionStats.toConfirm} urgentes</span>
+              )}
+            </div>
+            {pending.length === 0 && sessionStats.toConfirm === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Aucune action requise ✓</p>
+            ) : (
+              <div className="space-y-2">
+                {pending.length > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-xl">
+                    <ShieldCheck size={16} className="text-orange-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{pending.length} vérification{pending.length > 1 ? 's' : ''} CNI en attente</p>
+                      <p className="text-xs text-gray-400 truncate">{pending.slice(0, 3).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
+                    </div>
+                    <button onClick={() => setActiveTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
+                  </div>
+                )}
+                {sessionStats.toConfirm > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-xl">
+                    <Calendar size={16} className="text-blue-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
+                      <p className="text-xs text-gray-400">En attente de confirmation parent</p>
+                    </div>
+                    <button onClick={() => setActiveTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Cette semaine */}
+          <div className="card">
+            <h2 className="text-sm font-bold text-gray-900 mb-4">📊 Cette semaine</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Répétiteurs', value: `+${pending.length}`,           bg: 'bg-primary-50',   color: 'text-primary' },
+                { label: 'Parents',     value: `+${Math.max(0, parents.length - 10)}`, bg: 'bg-secondary-50', color: 'text-secondary' },
+                { label: 'Contrats',    value: `+${engStats.active}`,          bg: 'bg-green-50',     color: 'text-green-600' },
+                { label: 'Séances',     value: `+${sessionStats.upcoming}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
+              ].map(item => (
+                <div key={item.label} className={`${item.bg} rounded-xl p-4 text-center`}>
+                  <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
+                  <p className="text-xs text-gray-500 mt-1 font-medium">{item.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Revenue */}

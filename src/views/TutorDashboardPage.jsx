@@ -17,13 +17,22 @@ import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } 
 import DashboardLayout from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
-const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
-const DAYS_FR   = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
+const MONTHS_FR      = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
+const MONTHS_FR_LONG = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+const DAYS_FR        = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
 
 function toDate(str) { return new Date(str + 'T00:00:00') }
 function isDatePast(str) { return toDate(str) < new Date(new Date().toDateString()) }
 function shortDate(str) { const d = toDate(str); return `${d.getDate()} ${MONTHS_FR[d.getMonth()]}` }
 function dayFr(str) { return DAYS_FR[toDate(str).getDay()] }
+function daysUntil(str) { return Math.ceil((toDate(str) - new Date(new Date().toDateString())) / 86400000) }
+function sessionPill(dateStr) {
+  const n = daysUntil(dateStr)
+  if (n === 0) return { label: "Aujourd'hui", cls: 'bg-green-50 text-green-700' }
+  if (n === 1) return { label: 'Demain',       cls: 'bg-blue-50 text-blue-600' }
+  if (n <= 7)  return { label: `Dans ${n} jours`, cls: 'bg-blue-50 text-blue-600' }
+  return { label: 'Planifié', cls: 'bg-gray-100 text-gray-500' }
+}
 function isThisWeek(str) {
   const today = new Date(); const dow = today.getDay()
   const mon = new Date(today); mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1)); mon.setHours(0, 0, 0, 0)
@@ -172,9 +181,13 @@ export default function TutorDashboardPage() {
 
   // ── Derived data ─────────────────────────────────────────────
 
-  const allSessions       = getAllUserSessions(tutor?.id, 'tutor')
+  const allSessions         = getAllUserSessions(tutor?.id, 'tutor')
   const pendingEngagements  = engagements.filter(e => e.status === 'pending')
   const activeEngagements   = engagements.filter(e => e.status === 'active')
+  const upcomingSessions    = allSessions
+    .filter(s => !isDatePast(s.scheduledDate))
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''))
+    .slice(0, 5)
   const thisWeekSessions    = allSessions
     .filter(s => isThisWeek(s.scheduledDate))
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.scheduledTime.localeCompare(b.scheduledTime))
@@ -187,11 +200,12 @@ export default function TutorDashboardPage() {
   const isPremium         = tutor.subscription?.plan === 'premium'
   const hasId             = tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni
 
+  const monthlyRevenue = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
   const stats = [
-    { label: 'Vues ce mois',    value: tutor.profileViews || 0,      icon: <Eye size={20} />,         color: 'bg-blue-50 text-blue-600',         bar: 'bg-blue-500' },
-    { label: 'Contrats actifs', value: activeEngagements.length,      icon: <FileText size={20} />,    color: 'bg-secondary-50 text-secondary',   bar: 'bg-secondary' },
-    { label: 'Séances ce mois', value: monthSessionCount,             icon: <CheckCircle size={20} />, color: 'bg-green-50 text-green-600',       bar: 'bg-green-500' },
-    { label: 'Note moyenne',    value: tutor.rating > 0 ? `${tutor.rating.toFixed(1)}★` : '—', icon: <Star size={20} />, color: 'bg-yellow-50 text-yellow-600', bar: 'bg-accent' },
+    { label: 'Séances ce mois',   value: monthSessionCount,                                              emoji: '📅', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                         deltaClass: 'text-gray-400' },
+    { label: 'Revenus FCFA (mois)', value: monthlyRevenue > 0 ? monthlyRevenue.toLocaleString('fr-FR') : '0', emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: monthlyRevenue >= 100000, delta: monthlyRevenue > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlyRevenue > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Familles actives',  value: activeEngagements.length,                                        emoji: '👨‍👩‍👧', bg: 'bg-primary-50', bar: 'bg-primary', delta: '→ stable',                                           deltaClass: 'text-gray-400' },
+    { label: 'Note moyenne',      value: tutor.rating > 0 ? tutor.rating.toFixed(1) : '—',               emoji: '⭐', bg: 'bg-yellow-50',   bar: 'bg-accent',   delta: tutor.rating > 0 ? '↑ en hausse' : '→ stable',         deltaClass: tutor.rating > 0 ? 'text-green-600' : 'text-gray-400' },
   ]
 
   const PAY_LABELS = { cash: 'Cash', orange_money: 'Orange Money', wave: 'Wave', mtn_money: 'MTN Money' }
@@ -328,11 +342,14 @@ export default function TutorDashboardPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((s, i) => (
-            <div key={i} className="card relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-0.5 ${s.bar}`} />
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
-              <p className="text-xs text-gray-500 mt-1 font-medium">{s.label}</p>
+            <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
+              <div className={`absolute top-0 left-0 right-0 h-[3px] ${s.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${s.bg}`}>{s.emoji}</div>
+              <div className="min-w-0">
+                <p className={`font-black text-gray-900 tabular-nums leading-none ${s.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{s.value}</p>
+                <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{s.label}</p>
+                {s.delta && <p className={`text-[10px] font-bold mt-1 ${s.deltaClass}`}>{s.delta}</p>}
+              </div>
             </div>
           ))}
         </div>
@@ -393,49 +410,40 @@ export default function TutorDashboardPage() {
         )}
 
         <div className="grid md:grid-cols-2 gap-5">
-          {/* Planning de la semaine */}
+          {/* Agenda */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar size={18} className="text-primary" />
-                Planning de la semaine
-              </h2>
+              <h2 className="text-sm font-bold text-gray-900">📅 Agenda — {MONTHS_FR_LONG[new Date().getMonth()]}</h2>
+              <Link href="/reservations" className="text-xs text-primary font-medium hover:underline">Voir tout</Link>
             </div>
-            {thisWeekSessions.length === 0 ? (
+            {upcomingSessions.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar size={36} className="text-gray-200 mx-auto mb-3" />
                 <p className="text-sm text-gray-400">
-                  {activeEngagements.length === 0 ? 'Aucun contrat actif' : 'Aucune séance cette semaine'}
+                  {activeEngagements.length === 0 ? 'Aucun contrat actif' : 'Aucune séance à venir'}
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {thisWeekSessions.map(s => {
+                {upcomingSessions.map(s => {
                   const eng = engagements.find(e => e.id === s.engagementId)
                   const par = eng ? parentProfiles[eng.parentId] : null
+                  const d   = toDate(s.scheduledDate)
+                  const pill = sessionPill(s.scheduledDate)
                   return (
                     <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className="w-10 h-10 bg-primary-50 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-primary capitalize leading-none">{dayFr(s.scheduledDate)}</span>
-                        <span className="text-xs text-primary/60 leading-none">{s.scheduledDate.split('-')[2]}</span>
+                      <div className="w-11 text-center flex-shrink-0">
+                        <span className="text-xl font-black text-gray-800 leading-none block">{d.getDate()}</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">{MONTHS_FR[d.getMonth()]}</span>
                       </div>
+                      <div className="w-px h-9 bg-gray-200 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800">{eng?.subject}</p>
-                        <p className="text-xs text-gray-500">
-                          {par ? `${par.firstName} ${par.lastName}` : '…'} · {s.scheduledTime?.slice(0, 5)} ({s.durationMinutes} min)
+                        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
+                          {eng?.subject}{par ? ` — ${par.firstName} ${par.lastName}` : ''}
                         </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.scheduledTime?.slice(0, 5)} · {s.durationMinutes} min</p>
                       </div>
-                      {s.parentReport ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${
-                          s.parentReport === 'on_time' ? 'bg-green-50 text-green-700' :
-                          s.parentReport === 'late'    ? 'bg-orange-50 text-orange-700' :
-                          'bg-red-50 text-red-700'
-                        }`}>
-                          {s.parentReport === 'on_time' ? '✓' : s.parentReport === 'late' ? `⏰ +${s.lateMinutes}min` : '✗ Absent'}
-                        </span>
-                      ) : isDatePast(s.scheduledDate) ? (
-                        <span className="text-xs text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full whitespace-nowrap">En attente</span>
-                      ) : null}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
                     </div>
                   )
                 })}
@@ -443,46 +451,47 @@ export default function TutorDashboardPage() {
             )}
           </div>
 
-          {/* Abonnement */}
+          {/* Contrats actifs */}
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                <CreditCard size={18} className="text-primary" />
-                Abonnement
-              </h2>
-              <Link href="/abonnement" className="text-xs text-primary font-medium hover:underline">Gérer</Link>
+              <h2 className="text-sm font-bold text-gray-900">📋 Contrats actifs</h2>
+              <span className="text-xs text-gray-400">{activeEngagements.length} contrat{activeEngagements.length !== 1 ? 's' : ''}</span>
             </div>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Plan actuel</span>
-                <span className={`text-sm font-semibold ${isPremium ? 'text-accent' : 'text-gray-700'}`}>
-                  {getStatusLabel(tutor.subscription?.plan || 'gratuit')}
-                </span>
+            {activeEngagements.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText size={36} className="text-gray-200 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">Aucun contrat actif</p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Statut</span>
-                <StatusBadge status={tutor.subscription?.status || 'inactive'} />
+            ) : (
+              <div className="space-y-2">
+                {activeEngagements.slice(0, 4).map((e, idx) => {
+                  const par = parentProfiles[e.parentId]
+                  const bars = ['bg-secondary', 'bg-primary', 'bg-accent', 'bg-green-500']
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl">
+                      <div className={`w-1 h-10 rounded-full flex-shrink-0 ${bars[idx % bars.length]}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
+                          {par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'} · {e.subject}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{shortDate(e.startDate)} → {shortDate(e.endDate)}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-black text-gray-900">{formatFCFA(e.monthlyRate)}</p>
+                        <p className="text-[10px] font-bold text-green-600 mt-0.5">Actif ✓</p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              {isSubscriptionActive && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">Expire le</span>
-                    <span className="text-sm font-medium text-gray-700">{formatDateShort(tutor.subscription?.endDate)}</span>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Jours restants</span>
-                      <span className={daysLeft <= 5 ? 'text-red-500 font-semibold' : 'text-gray-600'}>{daysLeft} jours</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${daysLeft <= 5 ? 'bg-red-400' : daysLeft <= 10 ? 'bg-yellow-400' : 'bg-secondary'}`}
-                        style={{ width: `${Math.min(100, (daysLeft / 30) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
+            )}
+            {/* Abonnement mini-résumé */}
+            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">Abonnement · <span className={`font-semibold ${isPremium ? 'text-accent' : 'text-gray-700'}`}>{getStatusLabel(tutor.subscription?.plan || 'gratuit')}</span></p>
+                {isSubscriptionActive && <p className="text-[10px] text-gray-400 mt-0.5">{daysLeft} jours restants</p>}
+              </div>
+              <Link href="/abonnement" className="text-xs text-primary font-semibold hover:underline">Gérer</Link>
             </div>
           </div>
 

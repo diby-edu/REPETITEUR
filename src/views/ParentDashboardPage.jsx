@@ -148,11 +148,13 @@ export default function ParentDashboardPage() {
     return days >= 0 && days <= 5
   })
 
+  const upcomingSessions  = allSessions.filter(s => !isDatePast(s.scheduledDate))
+  const monthlySpend      = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
   const stats = [
-    { label: 'Contrats actifs',     value: activeEngagements.length,  icon: <FileText size={20} />,  color: 'bg-secondary-50 text-secondary',                                                                            bar: 'bg-secondary' },
-    { label: 'Séances à confirmer', value: sessionsToReport.length,   icon: <Clock size={20} />,     color: sessionsToReport.length > 0 ? 'bg-orange-50 text-orange-600' : 'bg-gray-50 text-gray-400', bar: sessionsToReport.length > 0 ? 'bg-orange-500' : 'bg-gray-300' },
-    { label: 'Cette semaine',       value: thisWeekSessions.length,   icon: <Calendar size={20} />,  color: 'bg-primary-50 text-primary',                                                                                bar: 'bg-primary' },
-    { label: 'Répétiteurs favoris', value: favoriteTutors.length,     icon: <Heart size={20} />,     color: 'bg-red-50 text-red-500',                                                                                    bar: 'bg-red-500' },
+    { label: 'Séances planifiées',    value: upcomingSessions.length,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: upcomingSessions.length > 0 ? '↑ à venir' : '→ stable',       deltaClass: upcomingSessions.length > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Contrats actifs',       value: activeEngagements.length,  emoji: '📋', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                                    deltaClass: 'text-gray-400' },
+    { label: 'Répétiteurs contactés', value: conversations.length,      emoji: '👨‍🏫', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: conversations.length > 0 ? '↑ en contact' : '→ stable',       deltaClass: conversations.length > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Dépenses FCFA (mois)',  value: monthlySpend > 0 ? monthlySpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: monthlySpend >= 100000, delta: monthlySpend > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlySpend > 0 ? 'text-orange-500' : 'text-gray-400' },
   ]
 
   // ── Handlers ────────────────────────────────────────────────
@@ -206,17 +208,18 @@ export default function ParentDashboardPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Avatar user={parent} size="lg" />
-            <div>
-              <h1 className="font-display text-2xl font-bold text-gray-900">Bonjour, {parent.firstName} !</h1>
-              <p className="text-gray-500 text-sm mt-0.5">Espace parent</p>
-            </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="font-display text-xl font-bold text-gray-900">Bonjour, {parent.firstName} 👋</h1>
+            <p className="text-gray-400 text-sm mt-0.5">
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {upcomingSessions.length > 0 && ` — ${upcomingSessions.length} séance${upcomingSessions.length > 1 ? 's' : ''} planifiée${upcomingSessions.length > 1 ? 's' : ''}`}
+            </p>
           </div>
-          <Link href="/recherche" className="btn-primary flex items-center gap-2">
-            <Search size={18} /> Trouver un répétiteur
-          </Link>
+          <div className="flex gap-2 flex-shrink-0">
+            <Link href="/favoris" className="btn-outline text-sm flex items-center gap-2"><Heart size={15} /> Mes favoris</Link>
+            <Link href="/recherche" className="btn-primary text-sm flex items-center gap-2"><Search size={15} /> + Trouver un répétiteur</Link>
+          </div>
         </div>
 
         {/* Alerts */}
@@ -268,14 +271,71 @@ export default function ParentDashboardPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((s, i) => (
-            <div key={i} className="card relative overflow-hidden">
-              <div className={`absolute top-0 left-0 right-0 h-0.5 ${s.bar}`} />
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${s.color}`}>{s.icon}</div>
-              <p className="text-2xl font-bold text-gray-900 tabular-nums">{s.value}</p>
-              <p className="text-xs text-gray-500 mt-1 font-medium">{s.label}</p>
+            <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
+              <div className={`absolute top-0 left-0 right-0 h-[3px] ${s.bar}`} />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${s.bg}`}>{s.emoji}</div>
+              <div className="min-w-0">
+                <p className={`font-black text-gray-900 tabular-nums leading-none ${s.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{s.value}</p>
+                <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{s.label}</p>
+                {s.delta && <p className={`text-[10px] font-bold mt-1 ${s.deltaClass}`}>{s.delta}</p>}
+              </div>
             </div>
           ))}
         </div>
+
+        {/* Répétiteurs disponibles — section principale */}
+        {matchingTutors.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">🎯 Répétiteurs disponibles — {parent.city}</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{matchingTutors.length} répétiteur{matchingTutors.length > 1 ? 's' : ''} · filtrés par matière</p>
+            </div>
+            <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {matchingTutors.slice(0, 6).map(t => (
+              <div key={t.id} className="border border-gray-100 rounded-xl p-4 flex flex-col gap-3 hover:shadow-sm transition-shadow">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{ backgroundColor: t.avatarColor || '#E87722' }}
+                  >
+                    {t.firstName?.[0]}{t.lastName?.[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-gray-900 text-sm leading-tight">{t.firstName} {t.lastName}</p>
+                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                      <MapPin size={10} /> {t.city}
+                      {t.rating > 0 && <span className="ml-1 text-accent font-semibold">★ {t.rating?.toFixed(1)}</span>}
+                    </p>
+                  </div>
+                </div>
+                {t.subjects?.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {t.subjects.slice(0, 3).map(s => (
+                      <span key={s} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
+                    ))}
+                    {t.subjects.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>}
+                  </div>
+                )}
+                {t.monthlyRate > 0 && <p className="text-sm font-black text-primary">{formatFCFA(t.monthlyRate)} / mois</p>}
+                <div className="flex gap-2 mt-auto">
+                  <button
+                    onClick={() => handleContactTutor(t.id)}
+                    disabled={contactingId === t.id}
+                    className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                  >
+                    {contactingId === t.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={12} />}
+                    Contacter
+                  </button>
+                  <Link href={`/repetiteur/${t.id}`} className="btn-outline text-xs py-2 px-3 text-center">Profil</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        )}
 
         {/* Séances à confirmer — prioritaire */}
         {sessionsToReport.length > 0 && (
@@ -470,92 +530,6 @@ export default function ParentDashboardPage() {
           </div>
         )}
 
-        {/* Répétiteurs disponibles */}
-        <div className="mt-6">
-          <div className="mb-4">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Users size={18} className="text-secondary" />
-              Répétiteurs disponibles à {parent.city}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {matchingTutors.length > 0
-                ? `${matchingTutors.length} répétiteur${matchingTutors.length > 1 ? 's' : ''} correspond${matchingTutors.length > 1 ? 'ent' : ''} à votre recherche`
-                : "Aucun répétiteur correspondant pour l'instant"}
-            </p>
-          </div>
-
-          {matchingTutors.length === 0 ? (
-            <div className="card text-center py-10">
-              <Users size={40} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm text-gray-400">Aucun répétiteur vérifié dans votre ville pour l'instant.</p>
-              <Link href="/recherche" className="text-xs text-primary font-medium mt-2 inline-block hover:underline">
-                Recherche avancée →
-              </Link>
-            </div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {matchingTutors.map(t => (
-                <div key={t.id} className="card flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                      style={{ backgroundColor: t.avatarColor || '#E87722' }}
-                    >
-                      {t.firstName?.[0]}{t.lastName?.[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-gray-900 text-sm">{t.firstName} {t.lastName}</p>
-                      <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={11} /> {t.city}</p>
-                    </div>
-                    {t.rating > 0 && (
-                      <div className="flex items-center gap-1 text-accent text-xs font-semibold flex-shrink-0">
-                        <Star size={12} fill="currentColor" /> {t.rating?.toFixed(1)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    {t.monthlyRate > 0 && (
-                      <p className="text-xs text-gray-600 font-medium">{formatFCFA(t.monthlyRate)} / mois</p>
-                    )}
-                    {t.subjects?.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {t.subjects.slice(0, 3).map(s => (
-                          <span
-                            key={s}
-                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}
-                          >
-                            {s}
-                          </span>
-                        ))}
-                        {t.subjects.length > 3 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-auto flex gap-2">
-                    <Link
-                      href={`/repetiteur/${t.id}`}
-                      className="btn-outline text-xs py-2 flex-1 text-center"
-                    >
-                      Profil
-                    </Link>
-                    <button
-                      onClick={() => handleContactTutor(t.id)}
-                      disabled={contactingId === t.id}
-                      className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-2 disabled:opacity-60"
-                    >
-                      {contactingId === t.id
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : <Send size={13} />}
-                      Contacter
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Modal rapport de séance ─────────────────────────────── */}

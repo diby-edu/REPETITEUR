@@ -9,6 +9,8 @@ import {
   Settings, BookOpen, Bell, LogOut, Users, ShieldCheck,
 } from 'lucide-react'
 
+const MONTHS_SHORT = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc']
+
 const NAV = {
   tutor: [
     { label: 'Tableau de bord', href: '/tableau-de-bord/repetiteur', icon: LayoutDashboard },
@@ -37,7 +39,7 @@ const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Administr
 
 export default function DashboardSidebar() {
   const { currentUser, logout } = useAuth()
-  const { getUnreadNotifCount } = useApp()
+  const { getUnreadNotifCount, getUserEngagements, getAllUserSessions, getUserConversations, tutors } = useApp()
   const pathname = usePathname()
   const router   = useRouter()
 
@@ -46,6 +48,41 @@ export default function DashboardSidebar() {
   const role       = currentUser.role
   const items      = NAV[role] || []
   const unreadN    = getUnreadNotifCount(currentUser.id)
+
+  // Mini-stats pour le résumé sidebar
+  const engagements   = getUserEngagements(currentUser.id, role) || []
+  const allSessions   = getAllUserSessions(currentUser.id, role) || []
+  const conversations = getUserConversations(currentUser.id) || []
+  const currentMonth  = new Date().toISOString().slice(0, 7)
+  const activeEng     = engagements.filter(e => e.status === 'active')
+  const monthSessions = allSessions.filter(s => s.scheduledDate?.startsWith(currentMonth))
+  const upcomingSess  = allSessions.filter(s => new Date(s.scheduledDate + 'T00:00:00') >= new Date(new Date().toDateString()))
+  const monthRevenue  = activeEng.reduce((s, e) => s + (e.monthlyRate || 0), 0)
+  const monthSpend    = activeEng.reduce((s, e) => s + (e.monthlyRate || 0), 0)
+  const verifiedT     = tutors?.filter(t => t.verificationStatus === 'verified') || []
+  const pendingT      = tutors?.filter(t => t.verificationStatus === 'pending') || []
+
+  const RESUME_ROWS = {
+    tutor: [
+      { label: 'Séances ce mois', value: monthSessions.length },
+      { label: 'Revenus mois',    value: monthRevenue > 0 ? `${monthRevenue.toLocaleString('fr-FR')} F` : '0 F' },
+      { label: 'Contrats actifs', value: activeEng.length },
+      { label: 'Note moyenne',    value: currentUser.rating > 0 ? `${currentUser.rating?.toFixed(1)} ★` : '—' },
+    ],
+    parent: [
+      { label: 'Séances planifiées',    value: upcomingSess.length },
+      { label: 'Contrats actifs',       value: activeEng.length },
+      { label: 'Répétiteurs contactés', value: conversations.length },
+      { label: 'Dépenses mois',         value: monthSpend > 0 ? `${monthSpend.toLocaleString('fr-FR')} F` : '0 F' },
+    ],
+    admin: [
+      { label: 'Répétiteurs vérifiés', value: verifiedT.length },
+      { label: 'En attente',           value: pendingT.length },
+      { label: 'Abonnements actifs',   value: tutors?.filter(t => t.subscription?.status === 'active').length || 0 },
+      { label: 'Séances ce mois',      value: monthSessions.length },
+    ],
+  }
+  const resumeRows = RESUME_ROWS[role] || []
 
   const isActive = (href) => pathname === href
 
@@ -119,6 +156,19 @@ export default function DashboardSidebar() {
           )}
         </Link>
       </nav>
+
+      {/* RÉSUMÉ mini-stats */}
+      {resumeRows.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-3 border-t border-white/10">
+          <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Résumé</p>
+          {resumeRows.map(row => (
+            <div key={row.label} className="flex justify-between items-center py-1">
+              <span className="text-[11px] text-white/55">{row.label}</span>
+              <span className="text-[11px] font-bold text-white">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Logout */}
       <div className="flex-shrink-0 px-3 pt-3 pb-5 border-t border-white/10">

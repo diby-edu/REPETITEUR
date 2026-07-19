@@ -1,20 +1,77 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { SUBJECTS, LEVELS } from '../data/constants'
 import CityCombobox from '../components/common/CityCombobox'
-import { CheckCircle, ChevronLeft } from 'lucide-react'
+import { CheckCircle, ChevronLeft, Mail, Shield } from 'lucide-react'
 
 const steps = ['Informations personnelles', 'Préférences', 'Confirmation']
 
+// ── OTP Input 8 cases (4+4) ───────────────────────────────────────
+
+function OtpInput({ value, onChange }) {
+  const refs = useRef([])
+  const len = 8
+  const chars = value.padEnd(len, ' ').split('').slice(0, len)
+
+  const update = (i, char) => {
+    const next = [...chars]
+    next[i] = char
+    onChange(next.join('').replace(/\s+/g, ''))
+  }
+
+  return (
+    <div
+      className="flex items-center gap-1.5 sm:gap-2 justify-center"
+      onPaste={e => {
+        e.preventDefault()
+        const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, len)
+        onChange(text)
+        refs.current[Math.min(text.length, len - 1)]?.focus()
+      }}
+    >
+      {chars.map((c, i) => (
+        <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+          <input
+            ref={el => { refs.current[i] = el }}
+            type="text"
+            inputMode="numeric"
+            maxLength={1}
+            value={c}
+            onChange={e => {
+              const v = e.target.value.replace(/\D/g, '').slice(-1)
+              update(i, v)
+              if (v && i < len - 1) refs.current[i + 1]?.focus()
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Backspace') {
+                if (!c && i > 0) { update(i - 1, ''); refs.current[i - 1]?.focus() }
+                else update(i, '')
+              }
+            }}
+            className="w-9 h-12 sm:w-10 sm:h-13 text-center text-lg font-bold border-2 rounded-xl outline-none focus:border-secondary transition-colors bg-white text-gray-900"
+          />
+          {i === 3 && <div className="w-3 h-0.5 bg-gray-300 rounded flex-shrink-0" />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Page principale ──────────────────────────────────────────────
+
 export default function RegisterParentPage() {
-  const { register } = useAuth()
+  const { register, verifyOtp } = useAuth()
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [submitted, setSubmitted] = useState(false)
-  const [emailConfirmation, setEmailConfirmation] = useState(false)
+  const [showOtp, setShowOtp] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [resendTimer, setResendTimer] = useState(60)
+  const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
@@ -30,6 +87,14 @@ export default function RegisterParentPage() {
       ? form.searchedSubjects.filter(x => x !== s)
       : [...form.searchedSubjects, s])
   }
+
+  // Timer de renvoi OTP
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const t = setTimeout(() => setResendTimer(r => r - 1), 1000)
+      return () => clearTimeout(t)
+    }
+  }, [resendTimer])
 
   const handleSubmit = async () => {
     setLoading(true)
@@ -53,33 +118,85 @@ export default function RegisterParentPage() {
       return
     }
     if (result.emailConfirmation) {
-      setEmailConfirmation(true)
+      setShowOtp(true)
+      setResendTimer(60)
       return
     }
     setSubmitted(true)
   }
 
-  if (emailConfirmation) {
+  const handleVerifyOtp = async () => {
+    setError('')
+    if (otpCode.replace(/\s/g, '').length !== 8) { setError('Entrez les 8 chiffres du code.'); return }
+    setLoading(true)
+    const result = await verifyOtp(form.email, otpCode)
+    setLoading(false)
+    if (!result.success) { setError(result.error || 'Code invalide ou expiré.'); return }
+    setSubmitted(true)
+  }
+
+  const handleResend = async () => {
+    if (resendTimer > 0) return
+    setError('')
+    setResent(false)
+    const { error: err } = await supabase.auth.resend({ type: 'signup', email: form.email })
+    if (err) { setError('Impossible de renvoyer le code.'); return }
+    setOtpCode('')
+    setResent(true)
+    setResendTimer(60)
+  }
+
+  // ── Écran OTP ─────────────────────────────────────────────────
+
+  if (showOtp) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle size={40} className="text-blue-500" />
+        <div className="w-full max-w-md">
+          <div className="card text-center">
+            <div className="w-16 h-16 bg-secondary-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield size={32} className="text-secondary" />
+            </div>
+            <h1 className="font-display text-2xl font-bold text-gray-900 mb-1">Vérifiez votre email</h1>
+            <p className="text-sm text-gray-500 mb-6">
+              Un code à 8 chiffres a été envoyé à<br />
+              <strong className="text-gray-800">{form.email}</strong>
+            </p>
+
+            <OtpInput value={otpCode} onChange={setOtpCode} />
+
+            <div className="mt-6 space-y-3">
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
+              {resent && <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-xl px-3 py-2">Code renvoyé !</p>}
+
+              <button
+                onClick={handleVerifyOtp}
+                disabled={loading || otpCode.replace(/\s/g, '').length < 8}
+                className="btn-secondary w-full flex items-center justify-center gap-2"
+              >
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Vérifier le code'}
+              </button>
+
+              <p className="text-sm text-gray-500">
+                Pas reçu ?{' '}
+                {resendTimer > 0
+                  ? <span className="text-gray-400">Renvoyer dans {resendTimer}s</span>
+                  : <button onClick={handleResend} className="text-secondary font-medium hover:underline">Renvoyer</button>
+                }
+              </p>
+              <p className="text-sm text-gray-400">
+                Mauvaise adresse ?{' '}
+                <button onClick={() => { setShowOtp(false); setStep(0); setOtpCode('') }} className="text-secondary font-medium hover:underline">
+                  Modifier l'email
+                </button>
+              </p>
+            </div>
           </div>
-          <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Confirmez votre email !</h1>
-          <p className="text-gray-500 mb-2">
-            Un email de confirmation a été envoyé à <strong>{form.email}</strong>.
-          </p>
-          <p className="text-sm text-gray-400 mb-6">
-            Cliquez sur le lien dans l'email pour activer votre compte, puis connectez-vous.
-          </p>
-          <button onClick={() => router.push('/connexion')} className="btn-primary">
-            Aller à la connexion
-          </button>
         </div>
       </div>
     )
   }
+
+  // ── Écran de succès ────────────────────────────────────────────
 
   if (submitted) {
     return (
@@ -92,8 +209,8 @@ export default function RegisterParentPage() {
           <p className="text-gray-500 mb-6">
             Bienvenue sur MonRépétiteur, <strong>{form.firstName}</strong> ! Votre compte parent est actif.
           </p>
-          <button onClick={() => router.push('/recherche')} className="btn-primary">
-            Trouver un répétiteur
+          <button onClick={() => router.push('/tableau-de-bord/parent')} className="btn-secondary">
+            Accéder à mon tableau de bord
           </button>
         </div>
       </div>

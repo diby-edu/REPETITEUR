@@ -126,13 +126,12 @@ export function AuthProvider({ children }) {
   }
 
   // Vérification OTP après signUp — retourne une session active
+  // setCurrentUser est géré par onAuthStateChange pour éviter le double setState (React #310)
   const verifyOtp = async (email, token) => {
     const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' })
     if (error) return { success: false, error: error.message }
     if (!data.session) return { success: false, error: 'Vérification échouée, réessayez.' }
-    const profile = await fetchProfile(data.user.id)
-    setCurrentUser(profile)
-    return { success: true, user: profile }
+    return { success: true, user: data.user }
   }
 
   const refreshCurrentUser = async () => {

@@ -533,7 +533,7 @@ export default function RegisterTutorPage() {
                 </div>
                 <h2 className="font-semibold text-lg text-gray-800 mb-1">Vérifiez votre email</h2>
                 <p className="text-sm text-gray-500">
-                  Un code à 6 chiffres a été envoyé à<br />
+                  Un code à 8 chiffres a été envoyé à<br />
                   <strong className="text-gray-800">{pendingEmail}</strong>
                 </p>
               </div>

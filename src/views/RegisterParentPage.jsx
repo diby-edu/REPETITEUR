@@ -104,22 +104,30 @@ export default function RegisterParentPage() {
     <div className="min-h-[calc(100vh-64px)] bg-surface px-4 py-10">
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-3 mb-8">
-          <Link href="/inscription" className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+          <button
+            onClick={() => step === 0 ? router.push('/inscription') : setStep(step - 1)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
             <ChevronLeft size={20} />
-          </Link>
+          </button>
           <div>
             <h1 className="font-display text-2xl font-bold text-gray-900">Inscription Parent</h1>
             <p className="text-gray-500 text-sm">Étape {step + 1} sur {steps.length}</p>
           </div>
         </div>
 
-        {/* Progress */}
+        {/* Progress — cliquable pour les étapes déjà visitées */}
         <div className="flex gap-2 mb-8">
           {steps.map((s, i) => (
-            <div key={i} className="flex-1 flex flex-col gap-1">
+            <button
+              key={i}
+              type="button"
+              onClick={() => i < step && setStep(i)}
+              className={`flex-1 flex flex-col gap-1 text-left ${i < step ? 'cursor-pointer' : 'cursor-default'}`}
+            >
               <div className={`h-1.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-secondary' : 'bg-gray-200'}`} />
-              <p className={`text-xs ${i === step ? 'text-secondary font-semibold' : 'text-gray-400'}`}>{s}</p>
-            </div>
+              <p className={`text-xs ${i === step ? 'text-secondary font-semibold' : i < step ? 'text-secondary/60 hover:text-secondary' : 'text-gray-400'}`}>{s}</p>
+            </button>
           ))}
         </div>
 

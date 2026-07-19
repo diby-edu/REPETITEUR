@@ -35,7 +35,10 @@ export default function Navbar() {
   }
 
   const navLinks = [
-    { label: 'Trouver un répétiteur', href: '/recherche', icon: <Search size={16} /> },
+    // "Trouver un répétiteur" uniquement pour les visiteurs et les parents
+    ...(!isAuthenticated || currentUser?.role === 'parent' ? [
+      { label: 'Trouver un répétiteur', href: '/recherche', icon: <Search size={16} /> },
+    ] : []),
     ...(isAuthenticated && currentUser?.role !== 'admin' ? [
       { label: 'Messages', href: '/messagerie', icon: <MessageCircle size={16} /> },
       { label: 'Réservations', href: '/reservations', icon: <BookOpen size={16} /> },
@@ -51,8 +54,8 @@ export default function Navbar() {
     <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0" onClick={() => setMenuOpen(false)}>
+          {/* Logo — redirige vers le dashboard si connecté */}
+          <Link href={isAuthenticated ? getDashboardLink() : '/'} className="flex items-center gap-2 flex-shrink-0" onClick={() => setMenuOpen(false)}>
             <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
               <span className="text-white font-display font-bold text-lg">M</span>
             </div>

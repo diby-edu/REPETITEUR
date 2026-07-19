@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import TutorCard from '../components/common/TutorCard'
 import StarRating from '../components/common/StarRating'
 import {
@@ -29,7 +30,16 @@ function AfricanPattern() {
 export default function HomePage() {
   const router = useRouter()
   const { getActiveTutors } = useApp()
+  const { currentUser, isAuthenticated } = useAuth()
   const [search, setSearch] = useState({ query: '', city: '' })
+
+  // Rediriger les utilisateurs déjà connectés vers leur espace
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return
+    if (currentUser.role === 'tutor') router.replace('/tableau-de-bord/repetiteur')
+    else if (currentUser.role === 'parent') router.replace('/tableau-de-bord/parent')
+    else if (currentUser.role === 'admin') router.replace('/admin')
+  }, [isAuthenticated, currentUser, router])
 
   const activeTutors = getActiveTutors()
   const featuredTutors = activeTutors

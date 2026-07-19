@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
@@ -28,7 +28,9 @@ export default function TutorDashboardPage() {
   const { openChat } = useChatBubble()
   const tutor = currentUser
   const [matchingParents, setMatchingParents] = useState([])
+  const [conversationPartners, setConversationPartners] = useState({})
   const [contactingId, setContactingId] = useState(null)
+  const fetchedPartnerIds = useRef(new Set())
 
   useEffect(() => {
     if (tutor?.id) {
@@ -67,6 +69,26 @@ export default function TutorDashboardPage() {
     }
     load()
   }, [tutor?.city, tutor?.subjects])
+
+  // Charger les profils des partenaires de conversation absents de matchingParents
+  useEffect(() => {
+    const convs = getUserConversations(tutor.id)
+    const unknownIds = convs
+      .map(c => c.participants.find(p => p !== tutor.id))
+      .filter(id => id && !matchingParents.find(p => p.id === id) && !fetchedPartnerIds.current.has(id))
+    if (unknownIds.length === 0) return
+    unknownIds.forEach(id => fetchedPartnerIds.current.add(id))
+    supabase
+      .from('profiles')
+      .select('id, first_name, last_name, avatar_color')
+      .in('id', unknownIds)
+      .then(({ data }) => {
+        if (!data) return
+        const map = {}
+        data.forEach(p => { map[p.id] = { id: p.id, firstName: p.first_name, lastName: p.last_name, avatarColor: p.avatar_color } })
+        setConversationPartners(prev => ({ ...prev, ...map }))
+      })
+  }, [getUserConversations(tutor.id).length, matchingParents.length])
 
   const handleContactParent = async (parentId) => {
     if (contactingId) return
@@ -173,8 +195,22 @@ export default function TutorDashboardPage() {
             </div>
           )}
 
+          {/* Missing documents — tutor hasn't submitted any ID yet */}
+          {!(tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni) && !isVerified && (
+            <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
+              <AlertCircle size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-orange-800">Dossier incomplet — documents manquants</p>
+                <p className="text-sm text-orange-700">Votre pièce d'identité n'a pas encore été soumise. Complétez votre dossier pour être vérifié par l'admin.</p>
+              </div>
+              <Link href="/parametres?tab=Documents" className="text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg whitespace-nowrap">
+                Soumettre
+              </Link>
+            </div>
+          )}
+
           {/* Pending verification */}
-          {tutor.verificationStatus === 'pending' && (
+          {tutor.verificationStatus === 'pending' && (tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni) && (
             <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
               <Clock size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -300,12 +336,12 @@ export default function TutorDashboardPage() {
                   {tutor.documents?.diplomes?.length ? `✓ ${tutor.documents.diplomes.length} soumis` : '✗ Manquant'}
                 </span>
               </div>
-              {tutor.documents?.selfiePath && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Selfie</span>
-                  <span className="text-sm font-medium text-green-600">✓ Soumis</span>
-                </div>
-              )}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Selfie avec pièce</span>
+                <span className={`text-sm font-medium ${tutor.documents?.selfiePath ? 'text-green-600' : 'text-red-500'}`}>
+                  {tutor.documents?.selfiePath ? '✓ Soumis' : '✗ Manquant'}
+                </span>
+              </div>
               {tutor.verificationStatus === 'verified' && (
                 <div className="bg-green-50 rounded-xl p-3 flex items-center gap-2">
                   <CheckCircle size={16} className="text-green-500" />
@@ -367,11 +403,11 @@ export default function TutorDashboardPage() {
                 {conversations.slice(0, 3).map(conv => {
                   const otherUserId = conv.participants.find(p => p !== tutor.id)
                   const unreadInConv = conv.unreadCount[tutor.id] || 0
-                  const parent = matchingParents.find(p => p.id === otherUserId)
+                  const parent = matchingParents.find(p => p.id === otherUserId) || conversationPartners[otherUserId]
                   const initials = parent
                     ? `${parent.firstName?.[0] || ''}${parent.lastName?.[0] || ''}`
-                    : '?'
-                  const name = parent ? `${parent.firstName} ${parent.lastName?.[0]}.` : 'Utilisateur'
+                    : '…'
+                  const name = parent ? `${parent.firstName} ${parent.lastName?.[0]}.` : '…'
                   return (
                     <button
                       key={conv.id}

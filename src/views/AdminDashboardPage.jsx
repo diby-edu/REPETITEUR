@@ -278,9 +278,15 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="text-xs text-gray-400 mt-1">Inscrit le {formatDateShort(tutor.joinDate)}</p>
                   </div>
-                  <div className="flex-shrink-0 min-w-[200px]">
+                  <div className="flex-shrink-0 min-w-[220px]">
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-gray-600 mb-2">Documents soumis :</p>
+
+                      {/* Aucun document */}
+                      {!tutor.documents?.idType && !tutor.documents?.cni && !tutor.documents?.cniRecto && !tutor.documents?.passport && (
+                        <p className="text-xs text-orange-500 italic">Aucun document soumis — le répétiteur doit passer par Paramètres → Documents.</p>
+                      )}
+
                       {/* Pièce d'identité */}
                       {tutor.documents?.idType === 'cni' && (
                         <>

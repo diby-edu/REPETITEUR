@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
@@ -8,25 +8,26 @@ import { SUBJECTS, LEVELS, QUARTIERS_BY_CITY } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
 import CityCombobox from '../components/common/CityCombobox'
 import {
-  CheckCircle, ChevronLeft, Upload, Clock, Info,
-  Home, Building2, Users, Wifi, FileText, Plus, Trash2,
-  Camera, RefreshCw,
+  CheckCircle, ChevronLeft, Upload, Clock, Home, Building2,
+  Users, Wifi, FileText, Plus, Camera, RefreshCw,
+  Eye, EyeOff, Mail, Shield,
 } from 'lucide-react'
 
-const MODALITY_ICONS = {
-  domicile_parent: <Home size={18} />,
-  domicile_repetiteur: <Building2 size={18} />,
-  lieu_neutre: <Users size={18} />,
-  en_ligne: <Wifi size={18} />,
-}
-
-const steps = ['Informations', 'Expertise', 'Documents', 'Selfie', 'Confirmation']
-
+const STEPS = ['Compte', 'Vérification', 'Informations', 'Expertise', 'Documents', 'Selfie']
 const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 const SLOTS = ['8h-10h', '10h-12h', '12h-14h', '14h-16h', '16h-18h', '18h-20h']
 const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', vendredi: 'Ven', samedi: 'Sam', dimanche: 'Dim' }
+const MODALITY_ICONS = {
+  domicile_parent: <Home size={16} />,
+  domicile_repetiteur: <Building2 size={16} />,
+  lieu_neutre: <Users size={16} />,
+  en_ligne: <Wifi size={16} />,
+}
+const AVATAR_COLORS = ['#E87722', '#2D6A4F', '#9B59B6', '#2980B9', '#E74C3C', '#16A085', '#D35400', '#1A5276']
 
-function FileUploadZone({ file, onFile, label, inputRef }) {
+// ── Composants locaux ────────────────────────────────────────────
+
+function FileUploadZone({ file, onFile, inputRef, label }) {
   return (
     <>
       <input
@@ -45,15 +46,15 @@ function FileUploadZone({ file, onFile, label, inputRef }) {
       >
         {file ? (
           <>
-            <FileText size={24} className="text-green-500" />
+            <FileText size={22} className="text-green-500" />
             <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
             <span className="text-xs text-gray-400">Cliquer pour changer</span>
           </>
         ) : (
           <>
-            <Upload size={24} className="text-gray-400" />
+            <Upload size={22} className="text-gray-400" />
             <span className="text-xs font-medium text-gray-600 text-center">{label}</span>
-            <span className="text-xs text-gray-400">JPG, PNG ou PDF — max 5 Mo</span>
+            <span className="text-xs text-gray-400">JPG, PNG ou PDF — 5 Mo max</span>
           </>
         )}
       </button>
@@ -61,52 +62,107 @@ function FileUploadZone({ file, onFile, label, inputRef }) {
   )
 }
 
+function OtpInput({ value, onChange }) {
+  const refs = useRef([])
+  const len = 6
+  const chars = value.padEnd(len, '').split('').slice(0, len)
+
+  const update = (i, char) => {
+    const next = [...chars]
+    next[i] = char
+    onChange(next.join('').replace(/\s+/g, ''))
+  }
+
+  return (
+    <div
+      className="flex gap-2 sm:gap-3 justify-center"
+      onPaste={e => {
+        e.preventDefault()
+        const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, len)
+        onChange(text)
+        refs.current[Math.min(text.length, len - 1)]?.focus()
+      }}
+    >
+      {chars.map((c, i) => (
+        <input
+          key={i}
+          ref={el => { refs.current[i] = el }}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={c}
+          onChange={e => {
+            const v = e.target.value.replace(/\D/g, '').slice(-1)
+            update(i, v)
+            if (v && i < len - 1) refs.current[i + 1]?.focus()
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Backspace') {
+              if (!c && i > 0) { update(i - 1, ''); refs.current[i - 1]?.focus() }
+              else update(i, '')
+            }
+          }}
+          className="w-11 h-14 text-center text-xl font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-white text-gray-900"
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── Page principale ──────────────────────────────────────────────
+
 export default function RegisterTutorPage() {
-  const { register } = useAuth()
+  const { verifyOtp, refreshCurrentUser, currentUser } = useAuth()
   const router = useRouter()
+
   const [step, setStep] = useState(0)
-  const [submitted, setSubmitted] = useState(false)
-  const [emailConfirmation, setEmailConfirmation] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '', password: '',
-    city: 'Abidjan', quartier: '', bio: '',
-    subjects: [], levels: [], monthlyRate: '', modalities: [],
-    availability: { lundi: [], mardi: [], mercredi: [], jeudi: [], vendredi: [], samedi: [], dimanche: [] },
-    idType: 'cni',
-    cniRectoFile: null,
-    cniVersoFile: null,
-    passportFile: null,
-    diplomas: [{ name: '', file: null }],
-    selfieDataUrl: null,
-  })
+  const [submitted, setSubmitted] = useState(false)
 
-  // Refs pour les inputs fichiers
-  const cniRectoRef = useRef(null)
-  const cniVersoRef = useRef(null)
-  const passportRef = useRef(null)
-  const diplomaRefs = useRef([])
+  // Étape 0
+  const [showPwd, setShowPwd] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
-  // Refs pour la caméra
+  // Étape 1 (OTP)
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [resent, setResent] = useState(false)
+  const [resendTimer, setResendTimer] = useState(0)
+
+  // Caméra selfie
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const streamRef = useRef(null)
   const [cameraActive, setCameraActive] = useState(false)
 
+  // Refs fichiers
+  const cniRectoRef = useRef(null)
+  const cniVersoRef = useRef(null)
+  const passportRef = useRef(null)
+
+  const [form, setForm] = useState({
+    email: '', password: '', confirmPassword: '',
+    firstName: '', lastName: '', phone: '', city: 'Abidjan', quartier: '', bio: '',
+    subjects: [], levels: [], monthlyRate: '', modalities: [],
+    availability: { lundi: [], mardi: [], mercredi: [], jeudi: [], vendredi: [], samedi: [], dimanche: [] },
+    idType: 'cni',
+    cniRectoFile: null, cniVersoFile: null, passportFile: null,
+    diplomas: [{ name: '', file: null }],
+    selfieDataUrl: null,
+    avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+  })
+
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
 
-  const toggleItem = (key, item) => {
+  const toggleItem = (key, item) =>
     set(key, form[key].includes(item) ? form[key].filter(x => x !== item) : [...form[key], item])
-  }
 
   const toggleAvailability = (day, slot) => {
-    const current = form.availability[day]
-    const updated = current.includes(slot) ? current.filter(s => s !== slot) : [...current, slot]
-    set('availability', { ...form.availability, [day]: updated })
+    const cur = form.availability[day]
+    set('availability', { ...form.availability, [day]: cur.includes(slot) ? cur.filter(s => s !== slot) : [...cur, slot] })
   }
 
-  // Sélection rapide — colonne (tout un créneau sur tous les jours)
   const toggleColumn = useCallback((slot) => {
     const allSelected = DAYS.every(d => form.availability[d].includes(slot))
     const updated = { ...form.availability }
@@ -117,133 +173,149 @@ export default function RegisterTutorPage() {
     set('availability', updated)
   }, [form.availability])
 
-  // Sélection rapide — ligne (tous les créneaux d'un jour)
   const toggleRow = useCallback((day) => {
     const allSelected = SLOTS.every(s => form.availability[day].includes(s))
     set('availability', { ...form.availability, [day]: allSelected ? [] : [...SLOTS] })
   }, [form.availability])
 
-  const selectAllSlots = () => {
+  const selectAll = () => {
     const updated = {}
     DAYS.forEach(d => { updated[d] = [...SLOTS] })
     set('availability', updated)
   }
 
-  const clearAllSlots = () => {
+  const clearAll = () => {
     const updated = {}
     DAYS.forEach(d => { updated[d] = [] })
     set('availability', updated)
   }
 
-  const quartiers = form.city === 'Abidjan' ? (QUARTIERS_BY_CITY['Abidjan'] || []) : []
-
-  const addDiploma = () => set('diplomas', [...form.diplomas, { name: '', file: null }])
-
-  const removeDiploma = (i) => set('diplomas', form.diplomas.filter((_, idx) => idx !== i))
-
-  const updateDiploma = (i, key, val) => {
-    set('diplomas', form.diplomas.map((d, idx) => idx === i ? { ...d, [key]: val } : d))
-  }
-
-  const idDocReady = form.idType === 'cni'
-    ? (form.cniRectoFile && form.cniVersoFile)
-    : form.passportFile
-
-  // Diplôme valide : les deux champs remplis OU les deux vides (si plusieurs diplômes, au moins un complet)
+  // Validation diplômes
   const diplomasValid = form.diplomas.every(d => {
-    const hasName = d.name.trim().length > 0
+    const hasName = d.name.trim() !== ''
     const hasFile = !!d.file
-    return (hasName && hasFile) || (!hasName && !hasFile)
+    return (!hasName && !hasFile) || (hasName && hasFile)
   })
   const diplomasReady = form.diplomas.some(d => d.name.trim() && d.file) && diplomasValid
 
-  // ── Selfie / Caméra ──────────────────────────────────────────
-
-  const startCamera = useCallback(async () => {
+  // Caméra
+  const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream
       setCameraActive(true)
     } catch {
-      alert('Impossible d\'accéder à la caméra. Vérifiez les autorisations de votre navigateur.')
+      setError('Impossible d\'activer la caméra. Vérifiez les autorisations.')
     }
-  }, [])
+  }
+
+  const capturePhoto = () => {
+    const canvas = canvasRef.current
+    const video = videoRef.current
+    if (!canvas || !video) return
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    canvas.getContext('2d').drawImage(video, 0, 0)
+    set('selfieDataUrl', canvas.toDataURL('image/jpeg', 0.85))
+    stopCamera()
+  }
 
   const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    streamRef.current = null
     setCameraActive(false)
   }, [])
 
-  const capturePhoto = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d').drawImage(video, 0, 0)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-    set('selfieDataUrl', dataUrl)
-    stopCamera()
-  }, [stopCamera])
-
-  const retakePhoto = useCallback(() => {
-    set('selfieDataUrl', null)
-    startCamera()
-  }, [startCamera])
-
-  // Stopper la caméra si on quitte l'étape selfie
   useEffect(() => {
-    if (step !== 3 && cameraActive) stopCamera()
+    if (step !== 5 && cameraActive) stopCamera()
   }, [step, cameraActive, stopCamera])
 
-  // ── Soumission ────────────────────────────────────────────────
+  // Timer renvoi OTP
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const t = setTimeout(() => setResendTimer(r => r - 1), 1000)
+      return () => clearTimeout(t)
+    }
+  }, [resendTimer])
 
-  const handleSubmit = async () => {
-    setLoading(true)
+  // ── Étape 0 : Créer le compte ─────────────────────────────────
+
+  const handleCreateAccount = async () => {
     setError('')
+    if (!form.email || !form.password) { setError('Remplissez tous les champs.'); return }
+    if (form.password.length < 8) { setError('Le mot de passe doit faire au moins 8 caractères.'); return }
+    if (form.password !== form.confirmPassword) { setError('Les mots de passe ne correspondent pas.'); return }
 
-    const result = await register({
+    setLoading(true)
+    const { data, error: err } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
-      role: 'tutor',
-      firstName: form.firstName,
-      lastName: form.lastName,
-      phone: form.phone,
+      options: { data: { role: 'tutor' } },
+    })
+    setLoading(false)
+
+    if (err) { setError(err.message); return }
+    if (!data.user) { setError('Erreur inattendue. Réessayez.'); return }
+
+    setPendingEmail(form.email)
+    setResendTimer(60)
+    setStep(1)
+  }
+
+  // ── Étape 1 : Vérifier OTP ───────────────────────────────────
+
+  const handleVerifyOtp = async () => {
+    setError('')
+    if (otpCode.replace(/\s/g, '').length !== 6) { setError('Entrez les 6 chiffres du code.'); return }
+
+    setLoading(true)
+    const result = await verifyOtp(pendingEmail, otpCode)
+    setLoading(false)
+
+    if (!result.success) { setError(result.error || 'Code invalide ou expiré.'); return }
+    setStep(2)
+  }
+
+  const handleResend = async () => {
+    if (resendTimer > 0) return
+    await supabase.auth.resend({ type: 'signup', email: pendingEmail })
+    setResent(true)
+    setResendTimer(60)
+    setTimeout(() => setResent(false), 4000)
+  }
+
+  // ── Soumission finale (étape 5 → selfie) ─────────────────────
+
+  const handleSubmit = async () => {
+    if (!currentUser?.id) return
+    setLoading(true)
+    setError('')
+    const userId = currentUser.id
+
+    // Mettre à jour le profil
+    await supabase.from('profiles').update({
+      first_name: form.firstName,
+      last_name: form.lastName,
+      phone: form.phone || null,
       city: form.city,
-      quartier: form.quartier,
-      avatarColor: '#9B59B6',
+      quartier: form.quartier || null,
+      avatar_color: form.avatarColor,
+    }).eq('id', userId)
+
+    // Mettre à jour les données répétiteur
+    await supabase.from('tutors').update({
       bio: form.bio,
       subjects: form.subjects,
       levels: form.levels,
-      monthlyRate: Number.parseInt(form.monthlyRate) || 25000,
+      monthly_rate: parseInt(form.monthlyRate) || 25000,
       modalities: form.modalities,
       availability: form.availability,
-      documents: {},
-    })
+    }).eq('id', userId)
 
-    if (!result.success) {
-      setError(result.error || 'Erreur lors de la création du compte.')
-      setLoading(false)
-      return
-    }
-
-    if (result.emailConfirmation) {
-      setLoading(false)
-      setEmailConfirmation(true)
-      return
-    }
-
-    const userId = result.user.id
+    // Uploader les documents
     const documents = { idType: form.idType }
 
-    // Uploader la pièce d'identité
     if (form.idType === 'cni') {
       if (form.cniRectoFile) {
         const ext = form.cniRectoFile.name.split('.').pop()
@@ -261,7 +333,6 @@ export default function RegisterTutorPage() {
       if (!e) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}` }
     }
 
-    // Uploader les diplômes
     const uploadedDiplomas = []
     for (let i = 0; i < form.diplomas.length; i++) {
       const d = form.diplomas[i]
@@ -273,45 +344,22 @@ export default function RegisterTutorPage() {
     }
     documents.diplomes = uploadedDiplomas
 
-    // Uploader le selfie
     if (form.selfieDataUrl) {
       try {
         const res = await fetch(form.selfieDataUrl)
         const blob = await res.blob()
         const { error: e } = await supabase.storage.from('documents').upload(`${userId}/selfie.jpg`, blob, { upsert: true, contentType: 'image/jpeg' })
         if (!e) documents.selfiePath = `${userId}/selfie.jpg`
-      } catch { /* selfie upload non bloquant */ }
+      } catch { /* non bloquant */ }
     }
 
     await supabase.from('tutors').update({ documents }).eq('id', userId)
-
+    await refreshCurrentUser()
     setLoading(false)
     setSubmitted(true)
   }
 
-  // ── Écrans de fin ────────────────────────────────────────────
-
-  if (emailConfirmation) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle size={40} className="text-blue-500" />
-          </div>
-          <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Confirmez votre email !</h1>
-          <p className="text-gray-500 mb-2">
-            Un email de confirmation a été envoyé à <strong>{form.email}</strong>.
-          </p>
-          <p className="text-sm text-gray-400 mb-6">
-            Cliquez sur le lien dans l'email pour activer votre compte, puis connectez-vous.
-          </p>
-          <button onClick={() => router.push('/connexion')} className="btn-primary">
-            Aller à la connexion
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // ── Écran de succès ───────────────────────────────────────────
 
   if (submitted) {
     return (
@@ -320,7 +368,7 @@ export default function RegisterTutorPage() {
           <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <Clock size={40} className="text-yellow-500" />
           </div>
-          <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Inscription soumise !</h1>
+          <h1 className="font-display text-2xl font-bold text-gray-900 mb-2">Dossier soumis !</h1>
           <p className="text-gray-500 mb-3">
             Merci <strong>{form.firstName}</strong> ! Votre dossier est en cours de vérification. Vous serez notifié sous 24-48h.
           </p>
@@ -328,8 +376,8 @@ export default function RegisterTutorPage() {
             <p className="font-semibold mb-1">En attendant la validation :</p>
             <ul className="list-disc list-inside space-y-1 text-left">
               <li>Votre profil est invisible des recherches</li>
+              <li>Complétez votre biographie dans les paramètres</li>
               <li>Choisissez un abonnement pour être prêt</li>
-              <li>Complétez votre biographie</li>
             </ul>
           </div>
           <button onClick={() => router.push('/tableau-de-bord/repetiteur')} className="btn-primary">
@@ -340,114 +388,234 @@ export default function RegisterTutorPage() {
     )
   }
 
-  // ── Formulaire principal ─────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────
+
+  const canGoBack = step > 0 && step !== 1
+  const goBack = () => {
+    setError('')
+    if (step > 2) setStep(step - 1)
+    else if (step === 2) setStep(0) // retour avant OTP = retour au début
+  }
+
+  // ── Validations par étape ─────────────────────────────────────
+
+  const canAdvance = (() => {
+    if (step === 2) return !!(form.firstName && form.lastName && form.phone && form.city)
+    if (step === 3) return form.subjects.length > 0 && form.levels.length > 0 && form.monthlyRate && form.modalities.length > 0
+    if (step === 4) {
+      const hasId = form.idType === 'cni' ? !!(form.cniRectoFile && form.cniVersoFile) : !!form.passportFile
+      return hasId && diplomasReady
+    }
+    return true
+  })()
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-surface px-4 py-10">
       <div className="max-w-2xl mx-auto">
+
+        {/* En-tête */}
         <div className="flex items-center gap-3 mb-8">
           <button
-            onClick={() => step === 0 ? router.push('/inscription') : setStep(step - 1)}
+            onClick={() => {
+              setError('')
+              if (step === 0) router.push('/inscription')
+              else if (canGoBack) goBack()
+            }}
             className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <ChevronLeft size={20} />
           </button>
           <div>
             <h1 className="font-display text-2xl font-bold text-gray-900">Inscription Répétiteur</h1>
-            <p className="text-gray-500 text-sm">Étape {step + 1} sur {steps.length}</p>
+            <p className="text-gray-500 text-sm">Étape {step + 1} sur {STEPS.length}</p>
           </div>
         </div>
 
-        {/* Barre de progression — cliquable pour les étapes déjà visitées */}
+        {/* Barre de progression */}
         <div className="flex gap-2 mb-8">
-          {steps.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => i < step && setStep(i)}
-              className={`flex-1 flex flex-col gap-1 text-left ${i < step ? 'cursor-pointer' : 'cursor-default'}`}
-            >
-              <div className={`h-1.5 rounded-full transition-colors duration-300 ${i <= step ? 'bg-primary' : 'bg-gray-200'}`} />
-              <p className={`text-xs hidden sm:block ${i === step ? 'text-primary font-semibold' : i < step ? 'text-primary/60 hover:text-primary' : 'text-gray-400'}`}>{s}</p>
-            </button>
+          {STEPS.map((s, i) => (
+            <div key={i} className="flex-1 flex flex-col gap-1">
+              <div className={`h-1.5 rounded-full transition-all duration-300 ${i <= step ? 'bg-primary' : 'bg-gray-200'}`} />
+              <p className={`text-xs hidden sm:block ${i === step ? 'text-primary font-semibold' : i < step ? 'text-primary/50' : 'text-gray-400'}`}>{s}</p>
+            </div>
           ))}
         </div>
 
         <div className="card">
 
-          {/* ── Étape 1 : Informations personnelles ─── */}
+          {/* ── Étape 0 : Compte ──────────────────────────── */}
           {step === 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 bg-primary-50 rounded-xl flex items-center justify-center">
+                  <Mail size={16} className="text-primary" />
+                </div>
+                <h2 className="font-semibold text-lg text-gray-800">Créer votre compte</h2>
+              </div>
+              <div>
+                <label htmlFor="reg-email" className="block text-sm font-medium text-gray-700 mb-1.5">Adresse email *</label>
+                <input
+                  id="reg-email"
+                  type="email"
+                  className="input-field"
+                  placeholder="votre@email.com"
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label htmlFor="reg-pwd" className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe * <span className="text-gray-400 font-normal">(8 caractères min.)</span></label>
+                <div className="relative">
+                  <input
+                    id="reg-pwd"
+                    type={showPwd ? 'text' : 'password'}
+                    className="input-field pr-10"
+                    placeholder="••••••••"
+                    value={form.password}
+                    onChange={e => set('password', e.target.value)}
+                    autoComplete="new-password"
+                  />
+                  <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="reg-confirm" className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer le mot de passe *</label>
+                <div className="relative">
+                  <input
+                    id="reg-confirm"
+                    type={showConfirm ? 'text' : 'password'}
+                    className="input-field pr-10"
+                    placeholder="••••••••"
+                    value={form.confirmPassword}
+                    onChange={e => set('confirmPassword', e.target.value)}
+                    autoComplete="new-password"
+                    onKeyDown={e => e.key === 'Enter' && handleCreateAccount()}
+                  />
+                  <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
+              <button
+                onClick={handleCreateAccount}
+                disabled={loading}
+                className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
+              >
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Créer mon compte et recevoir le code'}
+              </button>
+              <p className="text-center text-sm text-gray-500">
+                Déjà inscrit ? <Link href="/connexion" className="text-primary font-medium hover:underline">Se connecter</Link>
+              </p>
+            </div>
+          )}
+
+          {/* ── Étape 1 : Vérification OTP ────────────────── */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Shield size={28} className="text-primary" />
+                </div>
+                <h2 className="font-semibold text-lg text-gray-800 mb-1">Vérifiez votre email</h2>
+                <p className="text-sm text-gray-500">
+                  Un code à 6 chiffres a été envoyé à<br />
+                  <strong className="text-gray-800">{pendingEmail}</strong>
+                </p>
+              </div>
+
+              <OtpInput value={otpCode} onChange={setOtpCode} />
+
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-center">{error}</p>}
+              {resent && <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">Code renvoyé !</p>}
+
+              <button
+                onClick={handleVerifyOtp}
+                disabled={loading || otpCode.length < 6}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Vérifier le code'}
+              </button>
+
+              <p className="text-center text-sm text-gray-500">
+                Pas reçu ?{' '}
+                {resendTimer > 0 ? (
+                  <span className="text-gray-400">Renvoyer dans {resendTimer}s</span>
+                ) : (
+                  <button onClick={handleResend} className="text-primary font-medium hover:underline">
+                    Renvoyer le code
+                  </button>
+                )}
+              </p>
+              <p className="text-center text-xs text-gray-400">
+                Mauvaise adresse ?{' '}
+                <button onClick={() => { setStep(0); setOtpCode(''); setError('') }} className="text-primary hover:underline">
+                  Modifier l'email
+                </button>
+              </p>
+            </div>
+          )}
+
+          {/* ── Étape 2 : Informations personnelles ────────── */}
+          {step === 2 && (
             <div className="space-y-4">
               <h2 className="font-semibold text-lg text-gray-800">Informations personnelles</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Prénom *</label>
-                  <input className="input-field" value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="Amadou" />
+                  <label htmlFor="reg-fn" className="block text-sm font-medium text-gray-700 mb-1.5">Prénom *</label>
+                  <input id="reg-fn" className="input-field" value={form.firstName} onChange={e => set('firstName', e.target.value)} placeholder="Amadou" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom *</label>
-                  <input className="input-field" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Koné" />
+                  <label htmlFor="reg-ln" className="block text-sm font-medium text-gray-700 mb-1.5">Nom *</label>
+                  <input id="reg-ln" className="input-field" value={form.lastName} onChange={e => set('lastName', e.target.value)} placeholder="Koné" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email *</label>
-                <input type="email" className="input-field" value={form.email} onChange={e => set('email', e.target.value)} placeholder="votre@email.com" />
+                <label htmlFor="reg-phone" className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone *</label>
+                <input id="reg-phone" type="tel" className="input-field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+225 07 XX XX XX" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone *</label>
-                <input type="tel" className="input-field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+225 07 XX XX XX" />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville *</label>
+                <CityCombobox value={form.city} onChange={v => { set('city', v); set('quartier', '') }} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              {form.city && QUARTIERS_BY_CITY[form.city]?.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville *</label>
-                  <CityCombobox value={form.city} onChange={city => { set('city', city); set('quartier', '') }} />
+                  <label htmlFor="reg-quartier" className="block text-sm font-medium text-gray-700 mb-1.5">Quartier</label>
+                  <select id="reg-quartier" className="input-field" value={form.quartier} onChange={e => set('quartier', e.target.value)}>
+                    <option value="">Sélectionner un quartier</option>
+                    {QUARTIERS_BY_CITY[form.city].map(q => <option key={q}>{q}</option>)}
+                  </select>
                 </div>
-                {quartiers.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Quartier *</label>
-                    <select className="input-field" value={form.quartier} onChange={e => set('quartier', e.target.value)}>
-                      <option value="">Choisir un quartier</option>
-                      {quartiers.map(q => <option key={q}>{q}</option>)}
-                    </select>
-                  </div>
-                )}
-              </div>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Biographie *</label>
+                <label htmlFor="reg-bio" className="block text-sm font-medium text-gray-700 mb-1.5">Biographie <span className="text-gray-400 font-normal">(optionnel)</span></label>
                 <textarea
+                  id="reg-bio"
                   className="input-field resize-none h-28"
+                  placeholder="Décrivez votre expérience, votre méthode d'enseignement..."
                   value={form.bio}
                   onChange={e => set('bio', e.target.value)}
-                  placeholder="Décrivez votre expérience, vos diplômes, votre méthode d'enseignement..."
                   maxLength={600}
                 />
-                <p className="text-xs text-gray-400 mt-1">{form.bio.length}/600 caractères</p>
+                <p className="text-xs text-gray-400 mt-1">{form.bio.length}/600</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe *</label>
-                <input type="password" className="input-field" value={form.password} onChange={e => set('password', e.target.value)} placeholder="••••••••" />
-              </div>
-              <button
-                onClick={() => setStep(1)}
-                disabled={!form.firstName || !form.lastName || !form.email || !form.city || !form.bio || (quartiers.length > 0 && !form.quartier)}
-                className="btn-primary w-full disabled:opacity-50"
-              >
-                Continuer
-              </button>
             </div>
           )}
 
-          {/* ── Étape 2 : Expertise & Disponibilités ─── */}
-          {step === 1 && (
-            <div className="space-y-6">
-              <h2 className="font-semibold text-lg text-gray-800">Expertise & Disponibilités</h2>
+          {/* ── Étape 3 : Expertise ────────────────────────── */}
+          {step === 3 && (
+            <div className="space-y-5">
+              <h2 className="font-semibold text-lg text-gray-800">Expertise & disponibilités</h2>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Matières enseignées *</label>
+                <p className="text-sm font-medium text-gray-700 mb-2">Matières enseignées *</p>
                 <div className="flex flex-wrap gap-2">
                   {SUBJECTS.map(s => (
                     <button key={s} type="button" onClick={() => toggleItem('subjects', s)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${form.subjects.includes(s) ? 'bg-primary border-primary text-white' : 'border-gray-200 text-gray-600 hover:border-primary hover:text-primary'}`}>
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-all ${form.subjects.includes(s) ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:border-primary'}`}>
                       {s}
                     </button>
                   ))}
@@ -455,11 +623,11 @@ export default function RegisterTutorPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Niveaux enseignés *</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <p className="text-sm font-medium text-gray-700 mb-2">Niveaux *</p>
+                <div className="flex flex-wrap gap-2">
                   {LEVELS.map(l => (
                     <button key={l} type="button" onClick={() => toggleItem('levels', l)}
-                      className={`p-2.5 rounded-xl border-2 text-sm font-medium transition-all ${form.levels.includes(l) ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-all ${form.levels.includes(l) ? 'bg-secondary text-white border-secondary' : 'border-gray-200 text-gray-600 hover:border-secondary'}`}>
                       {l}
                     </button>
                   ))}
@@ -467,60 +635,42 @@ export default function RegisterTutorPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tarif par séance — 2h (FCFA) *</label>
-                <input type="number" className="input-field" value={form.monthlyRate} onChange={e => set('monthlyRate', e.target.value)} placeholder="Ex: 5000" min="1000" max="200000" step="500" />
+                <label htmlFor="reg-rate" className="block text-sm font-medium text-gray-700 mb-1.5">Tarif mensuel (FCFA) *</label>
+                <input id="reg-rate" type="number" className="input-field" placeholder="25000" value={form.monthlyRate}
+                  onChange={e => set('monthlyRate', e.target.value)} step="1000" min="0" />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Modalités acceptées *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {MODALITIES.map(m => {
-                    const selected = form.modalities.includes(m.id)
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => set('modalities', selected ? form.modalities.filter(x => x !== m.id) : [...form.modalities, m.id])}
-                        className={`flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${selected ? 'border-primary bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}
-                      >
-                        <span className={`mt-0.5 flex-shrink-0 ${selected ? 'text-primary' : 'text-gray-400'}`}>{MODALITY_ICONS[m.id]}</span>
-                        <div>
-                          <p className={`text-sm font-semibold ${selected ? 'text-primary' : 'text-gray-700'}`}>{m.label}</p>
-                          <p className="text-xs text-gray-400">{m.desc}</p>
-                        </div>
-                      </button>
-                    )
-                  })}
+                <p className="text-sm font-medium text-gray-700 mb-2">Modalités *</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODALITIES.map(m => (
+                    <button key={m.value} type="button" onClick={() => toggleItem('modalities', m.value)}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm transition-all text-left ${form.modalities.includes(m.value) ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {MODALITY_ICONS[m.value]}
+                      {m.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Grille de disponibilités avec en-têtes cliquables */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                    <Clock size={16} />Disponibilités
-                  </label>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={selectAllSlots} className="text-xs text-primary hover:underline font-medium">Tout sélectionner</button>
+                  <p className="text-sm font-medium text-gray-700">Disponibilités</p>
+                  <div className="flex gap-2 text-xs">
+                    <button type="button" onClick={selectAll} className="text-primary hover:underline">Tout sélectionner</button>
                     <span className="text-gray-300">|</span>
-                    <button type="button" onClick={clearAllSlots} className="text-xs text-gray-500 hover:underline">Tout effacer</button>
+                    <button type="button" onClick={clearAll} className="text-gray-400 hover:underline">Tout effacer</button>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <table className="min-w-full text-xs border-separate" style={{ borderSpacing: '2px' }}>
                     <thead>
                       <tr>
-                        {/* Coin vide */}
-                        <th className="w-8 py-1 pr-1" />
-                        {/* En-têtes colonnes cliquables = sélectionner ce créneau pour tous les jours */}
+                        <th className="w-8" />
                         {SLOTS.map(slot => (
-                          <th key={slot} className="py-1 px-0.5 text-center">
-                            <button
-                              type="button"
-                              title={`Sélectionner ${slot} tous les jours`}
-                              onClick={() => toggleColumn(slot)}
-                              className="text-gray-500 hover:text-primary font-normal whitespace-nowrap transition-colors px-1 py-0.5 rounded hover:bg-primary-50"
-                            >
+                          <th key={slot} className="px-1 pb-1">
+                            <button type="button" onClick={() => toggleColumn(slot)}
+                              className="w-full text-gray-500 font-medium hover:text-primary transition-colors text-center leading-tight">
                               {slot}
                             </button>
                           </th>
@@ -530,298 +680,202 @@ export default function RegisterTutorPage() {
                     <tbody>
                       {DAYS.map(day => (
                         <tr key={day}>
-                          {/* En-têtes lignes cliquables = sélectionner tous les créneaux du jour */}
-                          <td className="py-1 pr-1">
-                            <button
-                              type="button"
-                              title={`Sélectionner toute la journée`}
-                              onClick={() => toggleRow(day)}
-                              className="text-gray-600 font-medium hover:text-primary transition-colors px-1 py-0.5 rounded hover:bg-primary-50 w-full text-left"
-                            >
+                          <td>
+                            <button type="button" onClick={() => toggleRow(day)}
+                              className="w-8 text-center text-gray-500 font-medium hover:text-primary transition-colors py-1">
                               {DAY_LABELS[day]}
                             </button>
                           </td>
-                          {SLOTS.map(slot => (
-                            <td key={slot} className="py-1 px-0.5">
-                              <button
-                                type="button"
-                                onClick={() => toggleAvailability(day, slot)}
-                                className={`w-full h-7 rounded-lg transition-colors ${form.availability[day].includes(slot) ? 'bg-primary' : 'bg-gray-100 hover:bg-gray-200'}`}
-                              />
-                            </td>
-                          ))}
+                          {SLOTS.map(slot => {
+                            const active = form.availability[day].includes(slot)
+                            return (
+                              <td key={slot} className="px-0.5">
+                                <button type="button" onClick={() => toggleAvailability(day, slot)}
+                                  className={`w-full h-8 rounded-lg transition-colors ${active ? 'bg-primary text-white' : 'bg-gray-100 hover:bg-gray-200'}`} />
+                              </td>
+                            )
+                          })}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Cliquer sur un jour ou un créneau pour tout sélectionner. Orange = disponible.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button onClick={() => setStep(0)} className="btn-outline flex-1">Retour</button>
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={!form.subjects.length || !form.levels.length || !form.monthlyRate || !form.modalities.length}
-                  className="btn-primary flex-1 disabled:opacity-50"
-                >
-                  Continuer
-                </button>
               </div>
             </div>
           )}
 
-          {/* ── Étape 3 : Documents ─── */}
-          {step === 2 && (
+          {/* ── Étape 4 : Documents ────────────────────────── */}
+          {step === 4 && (
             <div className="space-y-5">
-              <h2 className="font-semibold text-lg text-gray-800">Documents de vérification</h2>
+              <h2 className="font-semibold text-lg text-gray-800">Pièces justificatives</h2>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800">
-                  Ces documents permettent de vérifier votre identité et vos qualifications. Votre profil sera validé sous 24-48h après soumission.
-                </p>
-              </div>
-
-              {/* Type de pièce */}
+              {/* Type pièce d'identité */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Type de pièce d'identité *</label>
-                <div className="flex gap-3">
-                  {[
-                    { value: 'cni', label: 'Carte Nationale d\'Identité' },
-                    { value: 'passport', label: 'Passeport' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set('idType', opt.value)}
-                      className={`flex-1 p-3 rounded-xl border-2 text-sm font-medium transition-all ${form.idType === opt.value ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                    >
-                      {opt.label}
+                <p className="text-sm font-medium text-gray-700 mb-2">Type de pièce d'identité *</p>
+                <div className="flex gap-3 mb-3">
+                  {['cni', 'passport'].map(type => (
+                    <button key={type} type="button" onClick={() => set('idType', type)}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${form.idType === type ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {type === 'cni' ? 'CNI' : 'Passeport'}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* CNI recto + verso */}
-              {form.idType === 'cni' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">CNI — Recto & Verso *</label>
+                {form.idType === 'cni' ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <FileUploadZone file={form.cniRectoFile} onFile={f => set('cniRectoFile', f)} label="Recto" inputRef={cniRectoRef} />
-                    <FileUploadZone file={form.cniVersoFile} onFile={f => set('cniVersoFile', f)} label="Verso" inputRef={cniVersoRef} />
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">CNI Recto *</p>
+                      <FileUploadZone file={form.cniRectoFile} onFile={f => set('cniRectoFile', f)} inputRef={cniRectoRef} label="Charger le recto" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1.5">CNI Verso *</p>
+                      <FileUploadZone file={form.cniVersoFile} onFile={f => set('cniVersoFile', f)} inputRef={cniVersoRef} label="Charger le verso" />
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Passeport */}
-              {form.idType === 'passport' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Passeport *</label>
-                  <FileUploadZone file={form.passportFile} onFile={f => set('passportFile', f)} label="Page principale du passeport" inputRef={passportRef} />
-                </div>
-              )}
+                ) : (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1.5">Page photo du passeport *</p>
+                    <FileUploadZone file={form.passportFile} onFile={f => set('passportFile', f)} inputRef={passportRef} label="Charger la page photo" />
+                  </div>
+                )}
+              </div>
 
               {/* Diplômes */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium text-gray-700">Diplôme(s) *</label>
-                  <button type="button" onClick={addDiploma} className="flex items-center gap-1 text-xs text-primary font-medium hover:underline">
-                    <Plus size={14} /> Ajouter un diplôme
+                  <p className="text-sm font-medium text-gray-700">Diplômes *</p>
+                  <button type="button" onClick={() => set('diplomas', [...form.diplomas, { name: '', file: null }])}
+                    className="text-xs text-primary flex items-center gap-1 hover:underline">
+                    <Plus size={13} /> Ajouter un diplôme
                   </button>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {form.diplomas.map((d, i) => {
-                    if (!diplomaRefs.current[i]) diplomaRefs.current[i] = { current: null }
                     const partialError = (d.name.trim() && !d.file) || (!d.name.trim() && !!d.file)
                     return (
-                      <div key={i} className={`border rounded-xl p-4 space-y-3 ${partialError ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium text-gray-700">Diplôme {i + 1}</p>
-                          {form.diplomas.length > 1 && (
-                            <button type="button" onClick={() => removeDiploma(i)} className="text-red-400 hover:text-red-600 transition-colors">
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
+                      <div key={i} className={`space-y-2 p-3 rounded-xl border ${partialError ? 'border-orange-300 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
                         <input
-                          className="input-field"
-                          placeholder="Ex: Licence de Mathématiques — Université de Cocody"
+                          className={`input-field text-sm ${partialError ? 'border-orange-300' : ''}`}
+                          placeholder={`Intitulé diplôme ${i + 1} (ex: Licence Mathématiques)`}
                           value={d.name}
-                          onChange={e => updateDiploma(i, 'name', e.target.value)}
+                          onChange={e => {
+                            const next = [...form.diplomas]
+                            next[i] = { ...next[i], name: e.target.value }
+                            set('diplomas', next)
+                          }}
                         />
-                        <input
-                          ref={el => { if (!diplomaRefs.current[i]) diplomaRefs.current[i] = {}; diplomaRefs.current[i].current = el }}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,application/pdf"
-                          className="hidden"
-                          onChange={e => updateDiploma(i, 'file', e.target.files?.[0] || null)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => diplomaRefs.current[i]?.current?.click()}
-                          className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center gap-3 transition-all cursor-pointer ${
-                            d.file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
-                          }`}
-                        >
-                          {d.file ? (
-                            <>
-                              <FileText size={20} className="text-green-500 flex-shrink-0" />
-                              <span className="text-xs font-medium text-green-700 truncate">{d.file.name}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={20} className="text-gray-400 flex-shrink-0" />
-                              <span className="text-xs text-gray-500">Cliquez pour sélectionner le fichier (JPG, PNG, PDF — max 5 Mo)</span>
-                            </>
-                          )}
-                        </button>
+                        {d.name.trim() && (
+                          <>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              className="hidden"
+                              id={`diploma-file-${i}`}
+                              onChange={e => {
+                                const next = [...form.diplomas]
+                                next[i] = { ...next[i], file: e.target.files?.[0] || null }
+                                set('diplomas', next)
+                              }}
+                            />
+                            <button type="button" onClick={() => document.getElementById(`diploma-file-${i}`)?.click()}
+                              className={`w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all ${
+                                d.file ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
+                              }`}>
+                              {d.file
+                                ? <><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> {d.file.name}</>
+                                : <><Upload size={14} /> Fichier du diplôme *</>
+                              }
+                            </button>
+                          </>
+                        )}
                         {partialError && (
-                          <p className="text-xs text-orange-600 font-medium">
-                            {d.name.trim() && !d.file ? 'Veuillez joindre le fichier du diplôme.' : 'Veuillez saisir l\'intitulé du diplôme.'}
-                          </p>
+                          <p className="text-xs text-orange-600">L'intitulé et le fichier sont tous les deux requis.</p>
                         )}
                       </div>
                     )
                   })}
                 </div>
-              </div>
-
-              <div className="flex gap-3">
-                <button onClick={() => setStep(1)} className="btn-outline flex-1">Retour</button>
-                <button
-                  onClick={() => setStep(3)}
-                  disabled={!idDocReady || !diplomasReady}
-                  className="btn-primary flex-1 disabled:opacity-50"
-                >
-                  Continuer
-                </button>
+                {!diplomasReady && form.diplomas.every(d => !d.name && !d.file) && (
+                  <p className="text-xs text-gray-400 mt-1">Ajoutez au moins un diplôme avec son fichier.</p>
+                )}
               </div>
             </div>
           )}
 
-          {/* ── Étape 4 : Selfie ─── */}
-          {step === 3 && (
+          {/* ── Étape 5 : Selfie ───────────────────────────── */}
+          {step === 5 && (
             <div className="space-y-5">
-              <h2 className="font-semibold text-lg text-gray-800">Selfie avec votre pièce d'identité</h2>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
-                <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <p className="font-semibold mb-1">Pourquoi ce selfie ?</p>
-                  <p>Tenez votre pièce d'identité à côté de votre visage et prenez une photo. Cela confirme que vous êtes bien le titulaire du document.</p>
-                </div>
+              <div>
+                <h2 className="font-semibold text-lg text-gray-800 mb-1">Selfie avec pièce d'identité</h2>
+                <p className="text-sm text-gray-500">Tenez votre pièce d'identité bien visible à côté de votre visage.</p>
               </div>
 
-              {/* Zone caméra / aperçu */}
-              <div className="rounded-2xl overflow-hidden bg-gray-900 aspect-video flex items-center justify-center relative">
-                {/* Vidéo caméra en direct */}
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
-                />
-                {/* Canvas (caché, utilisé pour la capture) */}
-                <canvas ref={canvasRef} className="hidden" />
-                {/* Photo capturée */}
-                {form.selfieDataUrl && !cameraActive && (
-                  <img src={form.selfieDataUrl} alt="Selfie" className="w-full h-full object-cover" />
-                )}
-                {/* État initial */}
-                {!cameraActive && !form.selfieDataUrl && (
-                  <div className="flex flex-col items-center gap-3 text-gray-400">
-                    <Camera size={48} className="opacity-40" />
-                    <p className="text-sm">Cliquez sur "Ouvrir la caméra" pour commencer</p>
+              <div className="bg-gray-50 rounded-2xl p-4">
+                {form.selfieDataUrl ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <img src={form.selfieDataUrl} alt="selfie" className="w-56 h-44 object-cover rounded-xl border-2 border-green-300" />
+                    <button type="button" onClick={() => { set('selfieDataUrl', null); startCamera() }}
+                      className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+                      <RefreshCw size={14} /> Reprendre la photo
+                    </button>
+                  </div>
+                ) : cameraActive ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <video ref={videoRef} autoPlay playsInline className="w-full max-w-xs rounded-xl" />
+                    <canvas ref={canvasRef} className="hidden" />
+                    <div className="flex gap-3">
+                      <button type="button" onClick={capturePhoto} className="btn-primary px-6">Capturer</button>
+                      <button type="button" onClick={stopCamera} className="btn-outline px-4">Annuler</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-3 py-4">
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                      <Camera size={28} className="text-gray-400" />
+                    </div>
+                    <p className="text-sm text-gray-400 text-center max-w-xs">
+                      Activez la caméra et prenez un selfie en tenant votre pièce d'identité visible.
+                    </p>
+                    <button type="button" onClick={startCamera}
+                      className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-xl transition-colors">
+                      <Camera size={16} /> Activer la caméra
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Boutons d'action */}
-              {!form.selfieDataUrl && !cameraActive && (
-                <button type="button" onClick={startCamera} className="btn-primary w-full flex items-center justify-center gap-2">
-                  <Camera size={18} /> Ouvrir la caméra
-                </button>
-              )}
-              {cameraActive && (
-                <button type="button" onClick={capturePhoto} className="btn-primary w-full flex items-center justify-center gap-2">
-                  <Camera size={18} /> Capturer
-                </button>
-              )}
-              {form.selfieDataUrl && (
-                <div className="flex gap-3">
-                  <button type="button" onClick={retakePhoto} className="btn-outline flex-1 flex items-center justify-center gap-2">
-                    <RefreshCw size={16} /> Recommencer
-                  </button>
-                  <div className="flex-1 flex items-center justify-center gap-2 text-green-600 font-medium text-sm">
-                    <CheckCircle size={18} /> Photo validée
-                  </div>
-                </div>
-              )}
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
 
-              <p className="text-xs text-gray-400 text-center">
-                La photo reste privée et ne sera vue que par notre équipe de vérification.
-              </p>
-
-              <div className="flex gap-3">
-                <button onClick={() => setStep(2)} className="btn-outline flex-1">Retour</button>
-                <button
-                  onClick={() => setStep(4)}
-                  disabled={!form.selfieDataUrl}
-                  className="btn-primary flex-1 disabled:opacity-50"
-                >
-                  Continuer
-                </button>
-              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={loading || !form.selfieDataUrl}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                {loading
+                  ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi en cours…</>
+                  : 'Soumettre mon dossier'
+                }
+              </button>
+              {!form.selfieDataUrl && (
+                <p className="text-center text-xs text-gray-400">Le selfie est requis pour compléter l'inscription.</p>
+              )}
             </div>
           )}
 
-          {/* ── Étape 5 : Confirmation ─── */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <h2 className="font-semibold text-lg text-gray-800">Récapitulatif</h2>
-              <div className="bg-primary-50 rounded-xl p-4 space-y-2">
-                {[
-                  ['Nom', `${form.firstName} ${form.lastName}`],
-                  ['Ville', `${form.quartier ? form.quartier + ', ' : ''}${form.city}`],
-                  ['Matières', form.subjects.join(', ')],
-                  ['Niveaux', form.levels.join(', ')],
-                  ['Tarif par séance (2h)', `${parseInt(form.monthlyRate || 0).toLocaleString('fr-FR')} FCFA`],
-                  ['Modalités', form.modalities.map(m => ({ domicile_parent: 'Dom. parent', domicile_repetiteur: 'Dom. répétiteur', lieu_neutre: 'Lieu neutre', en_ligne: 'En ligne' })[m]).join(', ')],
-                  ['Pièce d\'identité', form.idType === 'cni' ? 'CNI (recto + verso)' : 'Passeport'],
-                  ['Diplômes', form.diplomas.filter(d => d.name.trim()).map(d => d.name).join(', ')],
-                  ['Selfie', form.selfieDataUrl ? '✓ Capturé' : '—'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex justify-between text-sm">
-                    <span className="text-gray-500">{k}</span>
-                    <span className="font-medium text-gray-800 text-right max-w-[60%]">{v}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-800">
-                Votre profil sera <strong>en attente de vérification</strong> jusqu'à validation de vos documents par notre équipe.
-              </div>
-
-              <p className="text-xs text-gray-400">En vous inscrivant, vous acceptez nos CGU et notre politique de confidentialité.</p>
-              {error && <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-              <div className="flex gap-3">
-                <button onClick={() => setStep(3)} className="btn-outline flex-1" disabled={loading}>Retour</button>
-                <button onClick={handleSubmit} disabled={loading} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Soumettre mon dossier'}
-                </button>
-              </div>
+          {/* Bouton Suivant (étapes 2, 3, 4) */}
+          {step >= 2 && step <= 4 && (
+            <div className="mt-6 pt-5 border-t border-gray-100">
+              {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3">{error}</p>}
+              <button
+                onClick={() => { setError(''); setStep(step + 1) }}
+                disabled={!canAdvance}
+                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Suivant →
+              </button>
             </div>
           )}
         </div>
-
-        <p className="text-center text-sm text-gray-500 mt-4">
-          Déjà inscrit ?{' '}
-          <Link href="/connexion" className="text-primary font-medium hover:underline">Se connecter</Link>
-        </p>
       </div>
     </div>
   )

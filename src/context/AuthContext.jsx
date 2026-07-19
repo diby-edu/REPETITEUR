@@ -94,46 +94,42 @@ export function AuthProvider({ children }) {
     return { success: true, user: profile }
   }
 
-  const register = async ({ email, password, role, firstName, lastName, phone, city, quartier, avatarColor, ...tutorData }) => {
-    // Passer TOUTES les données en metadata — le trigger handle_new_user v2 les traite
-    // (nécessaire pour le flux avec confirmation email : pas de session active après signUp)
+  // Création de compte — uniquement email + mdp + rôle
+  // Le profil est complété après vérification OTP (session active)
+  const register = async ({ email, password, role, ...parentData }) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           role,
-          first_name: firstName,
-          last_name: lastName,
-          phone: phone || null,
-          city: city || null,
-          quartier: quartier || null,
-          avatar_color: avatarColor || '#E87722',
-          ...(role === 'tutor' && {
-            bio: tutorData.bio || '',
-            subjects: tutorData.subjects || [],
-            levels: tutorData.levels || [],
-            monthly_rate: tutorData.monthlyRate || 0,
-            modalities: tutorData.modalities || [],
-            availability: tutorData.availability || {},
-            documents: tutorData.documents || {},
-          }),
+          // Parents : on peut passer les données directement car pas de fichiers
           ...(role === 'parent' && {
-            subjects_needed: tutorData.subjectsNeeded || [],
-            child_level: tutorData.childLevel || null,
-            open_to_contact: tutorData.openToContact !== false,
+            first_name: parentData.firstName || '',
+            last_name: parentData.lastName || '',
+            phone: parentData.phone || null,
+            city: parentData.city || null,
+            quartier: parentData.quartier || null,
+            avatar_color: parentData.avatarColor || '#E87722',
+            subjects_needed: parentData.subjectsNeeded || [],
+            child_level: parentData.childLevel || null,
+            open_to_contact: parentData.openToContact !== false,
           }),
         },
       },
     })
     if (error) return { success: false, error: error.message }
+    if (!data.session) return { success: true, emailConfirmation: true }
+    const profile = await fetchProfile(data.user.id)
+    setCurrentUser(profile)
+    return { success: true, user: profile }
+  }
 
-    // Pas de session = confirmation email requise
-    if (!data.session) {
-      return { success: true, emailConfirmation: true }
-    }
-
-    // Session active = confirmation email désactivée — charger le profil
+  // Vérification OTP après signUp — retourne une session active
+  const verifyOtp = async (email, token) => {
+    const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'signup' })
+    if (error) return { success: false, error: error.message }
+    if (!data.session) return { success: false, error: 'Vérification échouée, réessayez.' }
     const profile = await fetchProfile(data.user.id)
     setCurrentUser(profile)
     return { success: true, user: profile }
@@ -197,6 +193,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!currentUser,
       login,
       register,
+      verifyOtp,
       logout,
       updateCurrentUser,
       refreshCurrentUser,

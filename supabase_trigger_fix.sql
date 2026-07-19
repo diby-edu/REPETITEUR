@@ -78,7 +78,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- (CREATE OR REPLACE FUNCTION suffit)
 
 -- ============================================================
--- CORRECTIF : réparer l'utilisateur brazilbrazil1982@gmail.com
+-- CORRECTIF : réparer l'utilisateur brazilbrazil1980@gmail.com
 -- (profil existe mais ligne tutors manquante)
 -- ============================================================
 
@@ -97,7 +97,7 @@ SELECT
   '{}'::jsonb,
   'pending'
 FROM public.profiles p
-WHERE p.email = 'brazilbrazil1982@gmail.com'
+WHERE p.email = 'brazilbrazil1980@gmail.com'
   AND p.role = 'tutor'
 ON CONFLICT (id) DO NOTHING;
 
@@ -105,4 +105,4 @@ ON CONFLICT (id) DO NOTHING;
 SELECT p.email, p.first_name, p.last_name, t.verification_status, t.documents
 FROM public.profiles p
 JOIN public.tutors t ON t.id = p.id
-WHERE p.email = 'brazilbrazil1982@gmail.com';
+WHERE p.email = 'brazilbrazil1980@gmail.com';

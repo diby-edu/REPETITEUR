@@ -1,28 +1,69 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
-import { SUBJECTS, LEVELS, CITIES } from '../data/constants'
+import { CITIES } from '../data/constants'
 import Avatar from '../components/common/Avatar'
 import {
   User, Lock, Bell, Trash2, Save, Eye, EyeOff,
-  LogOut, Clock
+  LogOut, Clock, FileText, Camera, RefreshCw, Plus, Upload,
+  CheckCircle, AlertCircle,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', vendredi: 'Ven', samedi: 'Sam', dimanche: 'Dim' }
 const TIME_SLOTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
 
-const TABS_TUTOR = ['Profil', 'Disponibilités', 'Sécurité', 'Notifications']
+const TABS_TUTOR = ['Profil', 'Documents', 'Disponibilités', 'Sécurité', 'Notifications']
 const TABS_OTHER = ['Profil', 'Sécurité', 'Notifications']
+const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Admin' }
+
+function DocUploadZone({ file, onFile, inputRef, label }) {
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        className="hidden"
+        onChange={e => onFile(e.target.files?.[0] || null)}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className={`w-full border-2 border-dashed rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+          file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+        }`}
+      >
+        {file ? (
+          <>
+            <CheckCircle size={20} className="text-green-500" />
+            <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
+            <span className="text-xs text-gray-400">Cliquer pour changer</span>
+          </>
+        ) : (
+          <>
+            <Upload size={20} className="text-gray-400" />
+            <span className="text-xs font-medium text-gray-600 text-center">{label}</span>
+            <span className="text-xs text-gray-400">JPG, PNG ou PDF — 5 Mo max</span>
+          </>
+        )}
+      </button>
+    </>
+  )
+}
 
 export default function SettingsPage() {
-  const { currentUser, logout, updateCurrentUser } = useAuth()
+  const { currentUser, logout, updateCurrentUser, refreshCurrentUser } = useAuth()
   const { showToast, updateTutorAvailability, getTutor } = useApp()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState('Profil')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(
+    TABS_TUTOR.includes(tabParam) ? tabParam : 'Profil'
+  )
   const [showPwd, setShowPwd] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -38,6 +79,130 @@ export default function SettingsPage() {
     DAYS.forEach(d => { base[d] = [] })
     return tutorData?.availability || base
   })
+
+  // ── Document upload state (tutors only) ──────────────────────
+  const existingDocs = currentUser?.documents || {}
+  const [docIdType, setDocIdType] = useState(existingDocs.idType || 'cni')
+  const [docCniRecto, setDocCniRecto] = useState(null)
+  const [docCniVerso, setDocCniVerso] = useState(null)
+  const [docPassport, setDocPassport] = useState(null)
+  const [docDiplomas, setDocDiplomas] = useState([{ name: '', file: null }])
+  const [docSelfieDataUrl, setDocSelfieDataUrl] = useState(null)
+  const [docCameraActive, setDocCameraActive] = useState(false)
+  const [docUploading, setDocUploading] = useState(false)
+  const [docDone, setDocDone] = useState(false)
+  const [docError, setDocError] = useState('')
+
+  const docVideoRef = useRef(null)
+  const docCanvasRef = useRef(null)
+  const docStreamRef = useRef(null)
+  const docCniRectoRef = useRef(null)
+  const docCniVersoRef = useRef(null)
+  const docPassportRef = useRef(null)
+
+  const startDocCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+      docStreamRef.current = stream
+      if (docVideoRef.current) docVideoRef.current.srcObject = stream
+      setDocCameraActive(true)
+    } catch {
+      showToast('Impossible d\'activer la caméra. Vérifiez les autorisations.', 'error')
+    }
+  }
+
+  const captureDocPhoto = () => {
+    const canvas = docCanvasRef.current
+    const video = docVideoRef.current
+    if (!canvas || !video) return
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    canvas.getContext('2d').drawImage(video, 0, 0)
+    setDocSelfieDataUrl(canvas.toDataURL('image/jpeg', 0.85))
+    stopDocCamera()
+  }
+
+  const stopDocCamera = () => {
+    if (docStreamRef.current) docStreamRef.current.getTracks().forEach(t => t.stop())
+    docStreamRef.current = null
+    setDocCameraActive(false)
+  }
+
+  const retakeDocPhoto = () => {
+    setDocSelfieDataUrl(null)
+    startDocCamera()
+  }
+
+  const handleUploadDocuments = async () => {
+    if (!currentUser?.id) return
+    setDocUploading(true)
+    setDocError('')
+    const userId = currentUser.id
+    const documents = { ...existingDocs, idType: docIdType }
+    let hasNewContent = false
+
+    if (docIdType === 'cni') {
+      if (docCniRecto) {
+        const ext = docCniRecto.name.split('.').pop()
+        const { error } = await supabase.storage.from('documents').upload(`${userId}/cni_recto.${ext}`, docCniRecto, { upsert: true })
+        if (!error) { documents.cniRecto = true; documents.cniRectoPath = `${userId}/cni_recto.${ext}`; hasNewContent = true }
+        else setDocError(`Erreur upload CNI recto : ${error.message}`)
+      }
+      if (docCniVerso) {
+        const ext = docCniVerso.name.split('.').pop()
+        const { error } = await supabase.storage.from('documents').upload(`${userId}/cni_verso.${ext}`, docCniVerso, { upsert: true })
+        if (!error) { documents.cniVerso = true; documents.cniVersoPath = `${userId}/cni_verso.${ext}`; hasNewContent = true }
+        else setDocError(`Erreur upload CNI verso : ${error.message}`)
+      }
+    } else if (docPassport) {
+      const ext = docPassport.name.split('.').pop()
+      const { error } = await supabase.storage.from('documents').upload(`${userId}/passport.${ext}`, docPassport, { upsert: true })
+      if (!error) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}`; hasNewContent = true }
+      else setDocError(`Erreur upload passeport : ${error.message}`)
+    }
+
+    const existingDiplomas = documents.diplomes || []
+    const newDiplomas = []
+    for (let i = 0; i < docDiplomas.length; i++) {
+      const d = docDiplomas[i]
+      if (!d.file || !d.name.trim()) continue
+      const ext = d.file.name.split('.').pop()
+      const path = `${userId}/diplome_${Date.now()}_${i}.${ext}`
+      const { error } = await supabase.storage.from('documents').upload(path, d.file, { upsert: true })
+      if (!error) { newDiplomas.push({ name: d.name.trim(), path }); hasNewContent = true }
+    }
+    documents.diplomes = [...existingDiplomas, ...newDiplomas]
+
+    if (docSelfieDataUrl) {
+      try {
+        const res = await fetch(docSelfieDataUrl)
+        const blob = await res.blob()
+        const { error } = await supabase.storage.from('documents').upload(`${userId}/selfie.jpg`, blob, { upsert: true, contentType: 'image/jpeg' })
+        if (!error) { documents.selfiePath = `${userId}/selfie.jpg`; hasNewContent = true }
+      } catch { /* non-bloquant */ }
+    }
+
+    if (!hasNewContent) {
+      setDocUploading(false)
+      setDocError('Aucun fichier sélectionné.')
+      return
+    }
+
+    const { error: dbErr } = await supabase.from('tutors').update({ documents, verification_status: 'pending' }).eq('id', userId)
+    if (dbErr) {
+      setDocError(`Erreur base de données : ${dbErr.message}`)
+      setDocUploading(false)
+      return
+    }
+
+    await refreshCurrentUser()
+    setDocUploading(false)
+    setDocDone(true)
+    setDocCniRecto(null); setDocCniVerso(null); setDocPassport(null)
+    setDocDiplomas([{ name: '', file: null }]); setDocSelfieDataUrl(null)
+    showToast('Documents soumis — en attente de vérification admin.')
+    setTimeout(() => setDocDone(false), 5000)
+  }
 
   const toggleSlot = (day, time) => {
     setAvailability(prev => {
@@ -101,6 +266,11 @@ export default function SettingsPage() {
     showToast('Compte supprimé. À bientôt !', 'info')
   }
 
+  const docs = currentUser?.documents || {}
+  const hasId = !!(docs.cniRecto || docs.passport || docs.cni)
+  const hasSelfie = !!docs.selfiePath
+  const diplomaCount = docs.diplomes?.length || 0
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-surface">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -110,23 +280,32 @@ export default function SettingsPage() {
           {/* Sidebar */}
           <div className="sm:w-48 flex-shrink-0">
             <nav className="card p-2">
-              {TABS.map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    activeTab === tab
-                      ? 'bg-primary-50 text-primary'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {tab === 'Profil' && <User size={16} />}
-                  {tab === 'Disponibilités' && <Clock size={16} />}
-                  {tab === 'Sécurité' && <Lock size={16} />}
-                  {tab === 'Notifications' && <Bell size={16} />}
-                  {tab}
-                </button>
-              ))}
+              {TABS.map(tab => {
+                const iconMap = {
+                  Profil: <User size={16} />,
+                  Documents: (
+                    <span className="relative inline-flex">
+                      <FileText size={16} />
+                      {!hasId && <span className="absolute -top-1 -right-1 w-2 h-2 bg-orange-400 rounded-full" />}
+                    </span>
+                  ),
+                  Disponibilités: <Clock size={16} />,
+                  Sécurité: <Lock size={16} />,
+                  Notifications: <Bell size={16} />,
+                }
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                      activeTab === tab ? 'bg-primary-50 text-primary' : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {iconMap[tab]}
+                    {tab}
+                  </button>
+                )
+              })}
               <div className="border-t border-gray-100 mt-2 pt-2">
                 <button
                   onClick={() => { logout(); router.push('/') }}
@@ -150,7 +329,7 @@ export default function SettingsPage() {
                     <p className="font-semibold text-gray-900 text-lg">{currentUser?.firstName} {currentUser?.lastName}</p>
                     <p className="text-gray-500 text-sm">{currentUser?.email}</p>
                     <p className="text-xs text-gray-400 capitalize mt-1">
-                      {currentUser?.role === 'tutor' ? 'Répétiteur' : currentUser?.role === 'parent' ? 'Parent' : 'Administrateur'}
+                      {ROLE_LABELS[currentUser?.role] || 'Admin'}
                     </p>
                   </div>
                 </div>
@@ -158,23 +337,23 @@ export default function SettingsPage() {
                 <form onSubmit={handleSaveProfile} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Prénom</label>
-                      <input className="input-field" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} />
+                      <label htmlFor="s-firstName" className="block text-sm font-medium text-gray-700 mb-1.5">Prénom</label>
+                      <input id="s-firstName" className="input-field" value={profile.firstName} onChange={e => setProfile(p => ({ ...p, firstName: e.target.value }))} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Nom</label>
-                      <input className="input-field" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} />
+                      <label htmlFor="s-lastName" className="block text-sm font-medium text-gray-700 mb-1.5">Nom</label>
+                      <input id="s-lastName" className="input-field" value={profile.lastName} onChange={e => setProfile(p => ({ ...p, lastName: e.target.value }))} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone</label>
-                    <input type="tel" className="input-field" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
+                    <label htmlFor="s-phone" className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone</label>
+                    <input id="s-phone" type="tel" className="input-field" value={profile.phone} onChange={e => setProfile(p => ({ ...p, phone: e.target.value }))} />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville</label>
-                    <select className="input-field" value={profile.city} onChange={e => setProfile(p => ({ ...p, city: e.target.value }))}>
+                    <label htmlFor="s-city" className="block text-sm font-medium text-gray-700 mb-1.5">Ville</label>
+                    <select id="s-city" className="input-field" value={profile.city} onChange={e => setProfile(p => ({ ...p, city: e.target.value }))}>
                       <option value="">Sélectionner</option>
                       {CITIES.map(c => <option key={c}>{c}</option>)}
                     </select>
@@ -183,8 +362,9 @@ export default function SettingsPage() {
                   {currentUser?.role === 'tutor' && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Biographie</label>
+                        <label htmlFor="s-bio" className="block text-sm font-medium text-gray-700 mb-1.5">Biographie</label>
                         <textarea
+                          id="s-bio"
                           className="input-field resize-none h-32"
                           value={profile.bio}
                           onChange={e => setProfile(p => ({ ...p, bio: e.target.value }))}
@@ -193,8 +373,8 @@ export default function SettingsPage() {
                         <p className="text-xs text-gray-400 mt-1">{profile.bio.length}/600</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">Tarif mensuel (FCFA)</label>
-                        <input type="number" className="input-field" value={profile.monthlyRate} onChange={e => setProfile(p => ({ ...p, monthlyRate: e.target.value }))} step="1000" />
+                        <label htmlFor="s-rate" className="block text-sm font-medium text-gray-700 mb-1.5">Tarif mensuel (FCFA)</label>
+                        <input id="s-rate" type="number" className="input-field" value={profile.monthlyRate} onChange={e => setProfile(p => ({ ...p, monthlyRate: e.target.value }))} step="1000" />
                       </div>
                     </>
                   )}
@@ -206,6 +386,196 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            )}
+
+            {/* Documents tab (tutors only) */}
+            {activeTab === 'Documents' && currentUser?.role === 'tutor' && (
+              <div className="space-y-4">
+
+                {/* Statut actuel */}
+                <div className="card">
+                  <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <FileText size={18} className="text-primary" />
+                    Statut de votre dossier
+                  </h2>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Pièce d\'identité', ok: hasId },
+                      { label: 'Selfie avec pièce', ok: hasSelfie },
+                      { label: `Diplôme${diplomaCount > 1 ? 's' : ''} (${diplomaCount} soumis)`, ok: diplomaCount > 0 },
+                    ].map(({ label, ok }) => (
+                      <div key={label} className="flex items-center gap-2 text-sm">
+                        {ok
+                          ? <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
+                          : <AlertCircle size={16} className="text-orange-400 flex-shrink-0" />
+                        }
+                        <span className={ok ? 'text-gray-700' : 'text-orange-700 font-medium'}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {docDone && (
+                    <div className="mt-3 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 text-sm text-green-700">
+                      <CheckCircle size={15} />
+                      Documents soumis — l'admin les vérifiera sous 24-48h.
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload form */}
+                <div className="card space-y-5">
+                  <h2 className="font-semibold text-gray-900">Soumettre / Compléter vos documents</h2>
+
+                  {/* Pièce d'identité */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Type de pièce d'identité</p>
+                    <div className="flex gap-3 mb-3">
+                      {['cni', 'passport'].map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setDocIdType(type)}
+                          className={`flex-1 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                            docIdType === type ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {type === 'cni' ? 'CNI' : 'Passeport'}
+                        </button>
+                      ))}
+                    </div>
+                    {docIdType === 'cni' ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1.5">CNI Recto</p>
+                          <DocUploadZone file={docCniRecto} onFile={setDocCniRecto} inputRef={docCniRectoRef} label="Charger le recto" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1.5">CNI Verso</p>
+                          <DocUploadZone file={docCniVerso} onFile={setDocCniVerso} inputRef={docCniVersoRef} label="Charger le verso" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1.5">Page photo du passeport</p>
+                        <DocUploadZone file={docPassport} onFile={setDocPassport} inputRef={docPassportRef} label="Charger la page photo" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Diplômes */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-gray-700">Diplômes à ajouter</p>
+                      <button
+                        type="button"
+                        onClick={() => setDocDiplomas(d => [...d, { name: '', file: null }])}
+                        className="text-xs text-primary flex items-center gap-1 hover:underline"
+                      >
+                        <Plus size={13} /> Ajouter
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {docDiplomas.map((d, i) => (
+                        <div key={i} className="space-y-2">
+                          <input
+                            className="input-field text-sm"
+                            placeholder={`Intitulé du diplôme ${i + 1} (ex: Licence Maths)`}
+                            value={d.name}
+                            onChange={e => {
+                              const next = [...docDiplomas]
+                              next[i] = { ...next[i], name: e.target.value }
+                              setDocDiplomas(next)
+                            }}
+                          />
+                          {d.name.trim() && (
+                            <>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                className="hidden"
+                                id={`doc-diploma-${i}`}
+                                onChange={e => {
+                                  const next = [...docDiplomas]
+                                  next[i] = { ...next[i], file: e.target.files?.[0] || null }
+                                  setDocDiplomas(next)
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById(`doc-diploma-${i}`)?.click()}
+                                className={`w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all ${
+                                  d.file ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
+                                }`}
+                              >
+                                {d.file ? <><CheckCircle size={14} className="text-green-500" /> {d.file.name}</> : <><Upload size={14} /> Fichier du diplôme</>}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {docs.diplomes?.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-2">{docs.diplomes.length} diplôme{docs.diplomes.length > 1 ? 's' : ''} déjà soumis — les nouveaux s'ajouteront.</p>
+                    )}
+                  </div>
+
+                  {/* Selfie */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Selfie avec pièce d'identité
+                      {hasSelfie && <span className="ml-2 text-xs text-green-600 font-normal">— déjà soumis</span>}
+                    </p>
+                    <div className="bg-gray-50 rounded-xl p-4">
+                      {docSelfieDataUrl ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <img src={docSelfieDataUrl} alt="selfie" className="w-48 h-36 object-cover rounded-xl border border-green-300" />
+                          <button type="button" onClick={retakeDocPhoto} className="text-xs text-primary flex items-center gap-1">
+                            <RefreshCw size={13} /> Reprendre
+                          </button>
+                        </div>
+                      ) : docCameraActive ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <video ref={docVideoRef} autoPlay playsInline className="w-full max-w-xs rounded-xl" />
+                          <canvas ref={docCanvasRef} className="hidden" />
+                          <div className="flex gap-3">
+                            <button type="button" onClick={captureDocPhoto} className="btn-primary text-sm px-5">
+                              Capturer
+                            </button>
+                            <button type="button" onClick={stopDocCamera} className="btn-outline text-sm px-4">
+                              Annuler
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-3 py-2">
+                          <p className="text-xs text-gray-500 text-center">
+                            Tenez votre pièce d'identité à côté de votre visage et activez la caméra.
+                          </p>
+                          <button type="button" onClick={startDocCamera} className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+                            <Camera size={16} />
+                            Activer la caméra
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {docError && (
+                    <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{docError}</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleUploadDocuments}
+                    disabled={docUploading}
+                    className="btn-primary w-full flex items-center justify-center gap-2"
+                  >
+                    {docUploading
+                      ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi en cours…</>
+                      : <><Save size={16} /> Soumettre les documents</>
+                    }
+                  </button>
+                </div>
               </div>
             )}
 
@@ -283,9 +653,10 @@ export default function SettingsPage() {
                   </h2>
                   <form onSubmit={handlePasswordChange} className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Nouveau mot de passe</label>
+                      <label htmlFor="s-newpwd" className="block text-sm font-medium text-gray-700 mb-1.5">Nouveau mot de passe</label>
                       <div className="relative">
                         <input
+                          id="s-newpwd"
                           type={showPwd ? 'text' : 'password'}
                           className="input-field pr-10"
                           placeholder="••••••••"
@@ -300,8 +671,9 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer le nouveau mot de passe</label>
+                      <label htmlFor="s-confirmpwd" className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer le nouveau mot de passe</label>
                       <input
+                        id="s-confirmpwd"
                         type="password"
                         className="input-field"
                         placeholder="••••••••"

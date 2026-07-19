@@ -3,12 +3,12 @@ import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
-import { CITIES } from '../data/constants'
+import { CITIES, LEVELS } from '../data/constants'
 import Avatar from '../components/common/Avatar'
 import {
   User, Lock, Bell, Trash2, Save, Eye, EyeOff,
   LogOut, Clock, FileText, Camera, RefreshCw, Plus, Upload,
-  CheckCircle, AlertCircle,
+  CheckCircle, AlertCircle, UserX,
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -241,7 +241,17 @@ export default function SettingsPage() {
     city: currentUser?.city || '',
     bio: currentUser?.bio || '',
     monthlyRate: currentUser?.monthlyRate || '',
+    childLevels: currentUser?.childLevels || [],
+    openToContact: currentUser?.openToContact !== false,
   })
+
+  const toggleProfileLevel = (l) =>
+    setProfile(prev => ({
+      ...prev,
+      childLevels: prev.childLevels.includes(l)
+        ? prev.childLevels.filter(x => x !== l)
+        : [...prev.childLevels, l],
+    }))
 
   const [notifications, setNotifications] = useState({
     newMessage: true,
@@ -375,6 +385,51 @@ export default function SettingsPage() {
                       <div>
                         <label htmlFor="s-rate" className="block text-sm font-medium text-gray-700 mb-1.5">Tarif mensuel (FCFA)</label>
                         <input id="s-rate" type="number" className="input-field" value={profile.monthlyRate} onChange={e => setProfile(p => ({ ...p, monthlyRate: e.target.value }))} step="1000" />
+                      </div>
+                    </>
+                  )}
+
+                  {currentUser?.role === 'parent' && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Niveau(x) scolaire(s)</label>
+                        <p className="text-xs text-gray-400 mb-2">Sélectionnez tous les niveaux de vos enfants</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {LEVELS.map(l => (
+                            <button
+                              key={l}
+                              type="button"
+                              onClick={() => toggleProfileLevel(l)}
+                              className={`p-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
+                                profile.childLevels.includes(l)
+                                  ? 'border-secondary bg-secondary-50 text-secondary'
+                                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              {l}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-xl p-4">
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={profile.openToContact}
+                            onChange={e => setProfile(p => ({ ...p, openToContact: e.target.checked }))}
+                            className="mt-0.5 w-4 h-4 accent-secondary flex-shrink-0"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                              <UserX size={14} className="text-gray-500" />
+                              Accepter d'être contacté par des répétiteurs
+                            </p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              Décochez si vous avez déjà trouvé un répétiteur et ne souhaitez plus être sollicité.
+                            </p>
+                          </div>
+                        </label>
                       </div>
                     </>
                   )}

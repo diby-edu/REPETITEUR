@@ -33,6 +33,7 @@ export function AuthProvider({ children }) {
       // Données parent
       subjectsNeeded: profile.subjects_needed || [],
       childLevel: profile.child_level || null,
+      childLevels: profile.child_levels || [],
       openToContact: profile.open_to_contact !== false,
       // Données tutor
       ...(tutor && {
@@ -112,7 +113,7 @@ export function AuthProvider({ children }) {
             quartier: parentData.quartier || null,
             avatar_color: parentData.avatarColor || '#E87722',
             subjects_needed: parentData.subjectsNeeded || [],
-            child_level: parentData.childLevel || null,
+            child_levels: parentData.childLevels || [],
             open_to_contact: parentData.openToContact !== false,
           }),
         },
@@ -156,6 +157,8 @@ export function AuthProvider({ children }) {
     if (updates.phone !== undefined) profileUpdates.phone = updates.phone
     if (updates.city !== undefined) profileUpdates.city = updates.city
     if (updates.quartier !== undefined) profileUpdates.quartier = updates.quartier
+    if (updates.childLevels !== undefined) profileUpdates.child_levels = updates.childLevels
+    if (updates.openToContact !== undefined) profileUpdates.open_to_contact = updates.openToContact
 
     if (Object.keys(profileUpdates).length > 0) {
       await supabase.from('profiles').update(profileUpdates).eq('id', currentUser.id)

@@ -76,7 +76,7 @@ export default function RegisterParentPage() {
   const [error, setError] = useState('')
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
-    city: '', childLevel: '', searchedSubjects: [],
+    city: '', childLevels: [], searchedSubjects: [],
     openToContact: true, password: '',
   })
 
@@ -86,6 +86,12 @@ export default function RegisterParentPage() {
     set('searchedSubjects', form.searchedSubjects.includes(s)
       ? form.searchedSubjects.filter(x => x !== s)
       : [...form.searchedSubjects, s])
+  }
+
+  const toggleLevel = (l) => {
+    set('childLevels', form.childLevels.includes(l)
+      ? form.childLevels.filter(x => x !== l)
+      : [...form.childLevels, l])
   }
 
   // Timer de renvoi OTP
@@ -109,7 +115,7 @@ export default function RegisterParentPage() {
       city: form.city,
       avatarColor: '#16A085',
       subjectsNeeded: form.searchedSubjects,
-      childLevel: form.childLevel,
+      childLevels: form.childLevels,
       openToContact: form.openToContact,
     })
     setLoading(false)
@@ -292,15 +298,16 @@ export default function RegisterParentPage() {
           {step === 1 && (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Niveau scolaire de votre enfant *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Niveau(x) scolaire(s) de votre enfant *</label>
+                <p className="text-xs text-gray-400 mb-3">Vous pouvez sélectionner plusieurs niveaux</p>
                 <div className="grid grid-cols-2 gap-2">
                   {LEVELS.map(l => (
                     <button
                       key={l}
                       type="button"
-                      onClick={() => set('childLevel', l)}
+                      onClick={() => toggleLevel(l)}
                       className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                        form.childLevel === l
+                        form.childLevels.includes(l)
                           ? 'border-secondary bg-secondary-50 text-secondary'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
@@ -350,7 +357,7 @@ export default function RegisterParentPage() {
 
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setStep(0)} className="btn-outline flex-1">Retour</button>
-                <button onClick={() => setStep(2)} disabled={!form.childLevel} className="btn-secondary flex-1 disabled:opacity-50">
+                <button onClick={() => setStep(2)} disabled={form.childLevels.length === 0} className="btn-secondary flex-1 disabled:opacity-50">
                   Continuer
                 </button>
               </div>
@@ -367,7 +374,7 @@ export default function RegisterParentPage() {
                   ['Email', form.email],
                   ['Téléphone', form.phone || '—'],
                   ['Ville', form.city],
-                  ['Niveau de l\'enfant', form.childLevel],
+                  ['Niveau(x) de l\'enfant', form.childLevels.join(', ') || '—'],
                   ['Matières recherchées', form.searchedSubjects.join(', ') || 'Non spécifié'],
                   ['Ouvert aux contacts répétiteurs', form.openToContact ? 'Oui' : 'Non'],
                 ].map(([k, v]) => (

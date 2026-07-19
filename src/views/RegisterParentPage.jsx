@@ -138,6 +138,7 @@ export default function RegisterParentPage() {
     const result = await verifyOtp(form.email, otpCode)
     setLoading(false)
     if (!result.success) { setError(result.error || 'Code invalide ou expiré.'); return }
+    setShowOtp(false)
     setSubmitted(true)
   }
 

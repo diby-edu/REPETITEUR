@@ -65,7 +65,7 @@ function FileUploadZone({ file, onFile, inputRef, label }) {
 function OtpInput({ value, onChange }) {
   const refs = useRef([])
   const len = 6
-  const chars = value.padEnd(len, '').split('').slice(0, len)
+  const chars = value.padEnd(len, ' ').split('').slice(0, len)
 
   const update = (i, char) => {
     const next = [...chars]

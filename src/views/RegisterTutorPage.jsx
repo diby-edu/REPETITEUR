@@ -256,6 +256,7 @@ export default function RegisterTutorPage() {
     setLoading(false)
 
     if (err) {
+      console.error('[Signup] Supabase error:', { message: err.message, status: err.status, code: err.code, name: err.name, raw: JSON.stringify(err) })
       const msg = err.message
       if (!msg || msg === '{}') setError('Erreur lors de la création du compte. Réessayez.')
       else if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) setError('Cet email est déjà utilisé. Connectez-vous plutôt.')

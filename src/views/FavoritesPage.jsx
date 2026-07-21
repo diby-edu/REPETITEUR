@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import TutorCard from '../components/common/TutorCard'
 import { Heart, Search } from 'lucide-react'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 export default function FavoritesPage() {
   const { getUserFavorites, loadUserFavorites } = useApp()
@@ -17,7 +18,7 @@ export default function FavoritesPage() {
   const favorites = getUserFavorites(currentUser.id)
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-center gap-3 mb-6">
           <Heart size={22} className="text-red-500 fill-red-500" />
@@ -47,6 +48,6 @@ export default function FavoritesPage() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

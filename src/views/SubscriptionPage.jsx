@@ -8,6 +8,7 @@ import { SUBSCRIPTION_PLANS } from '../data/constants'
 import { StatusBadge } from '../components/common/Badge'
 import { CheckCircle, Star, Zap, CreditCard, X, Shield, AlertCircle, Clock } from 'lucide-react'
 import { formatFCFA, formatDateShort, getSubscriptionDaysLeft } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 export default function SubscriptionPage() {
   const { currentUser, refreshCurrentUser } = useAuth()
@@ -82,7 +83,7 @@ export default function SubscriptionPage() {
   const planToConfirm = SUBSCRIPTION_PLANS.find(p => p.id === confirmModal)
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
       {/* Payment modal */}
       {confirmModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -331,6 +332,6 @@ export default function SubscriptionPage() {
           </p>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

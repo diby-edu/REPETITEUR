@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { Bell, MessageCircle, Calendar, ShieldCheck, Star, Zap, CreditCard, X } from 'lucide-react'
 import { timeAgo } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 const typeConfig = {
   new_message: { icon: <MessageCircle size={18} />, color: 'bg-blue-50 text-blue-500' },
@@ -35,7 +36,7 @@ export default function NotificationsPage() {
   }, [currentUser.id, markNotificationsRead])
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="font-display text-2xl font-bold text-gray-900 flex items-center gap-3">
@@ -94,6 +95,6 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import Avatar from '../components/common/Avatar'
 import { Send, MessageCircle, ArrowLeft, Shield } from 'lucide-react'
 import { timeAgo, formatTime, filterPhoneAndEmail } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 export default function MessagingPage() {
   const { convId } = useParams()
@@ -142,7 +143,8 @@ export default function MessagingPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col bg-surface">
+    <DashboardLayout>
+    <div className="h-full flex flex-col bg-surface">
       <div className="flex-1 flex overflow-hidden max-w-6xl mx-auto w-full px-0 sm:px-6 py-0 sm:py-6">
         <div className="flex flex-1 overflow-hidden sm:rounded-2xl sm:border sm:border-gray-100 sm:shadow-card bg-white">
           {/* Conversation list */}
@@ -280,5 +282,6 @@ export default function MessagingPage() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   )
 }

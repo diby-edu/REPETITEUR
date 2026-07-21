@@ -5,33 +5,24 @@ import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
 import {
-  LayoutDashboard, Calendar, MessageCircle, Heart, Search,
-  Settings, BookOpen, Bell, LogOut, Users, ShieldCheck,
+  LayoutDashboard, Calendar, Settings, BookOpen, LogOut, Users, ShieldCheck,
 } from 'lucide-react'
-
-const MONTHS_SHORT = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc']
 
 const NAV = {
   tutor: [
     { label: 'Tableau de bord', href: '/tableau-de-bord/repetiteur', icon: LayoutDashboard },
     { label: 'Séances',         href: '/reservations',               icon: Calendar },
-    { label: 'Messages',        href: '/messagerie',                 icon: MessageCircle },
     { label: 'Abonnement',      href: '/abonnement',                 icon: BookOpen },
-    { label: 'Paramètres',      href: '/parametres',                 icon: Settings },
   ],
   parent: [
-    { label: 'Tableau de bord',       href: '/tableau-de-bord/parent', icon: LayoutDashboard },
-    { label: 'Trouver un répétiteur', href: '/recherche',              icon: Search },
-    { label: 'Séances',               href: '/reservations',           icon: Calendar },
-    { label: 'Messages',              href: '/messagerie',             icon: MessageCircle },
-    { label: 'Favoris',               href: '/favoris',               icon: Heart },
-    { label: 'Paramètres',            href: '/parametres',            icon: Settings },
+    { label: 'Tableau de bord', href: '/tableau-de-bord/parent', icon: LayoutDashboard },
+    { label: 'Séances',         href: '/reservations',           icon: Calendar },
+    { label: 'Paramètres',      href: '/parametres',             icon: Settings },
   ],
   admin: [
     { label: 'Tableau de bord', href: '/admin',      icon: LayoutDashboard },
     { label: 'Utilisateurs',    href: '/admin',      icon: Users },
     { label: 'Vérifications',   href: '/admin',      icon: ShieldCheck },
-    { label: 'Paramètres',      href: '/parametres', icon: Settings },
   ],
 }
 
@@ -39,15 +30,14 @@ const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Administr
 
 export default function DashboardSidebar() {
   const { currentUser, logout } = useAuth()
-  const { getUnreadNotifCount, getUserEngagements, getAllUserSessions, getUserConversations, tutors } = useApp()
+  const { getUserEngagements, getAllUserSessions, getUserConversations, tutors } = useApp()
   const pathname = usePathname()
   const router   = useRouter()
 
   if (!currentUser) return null
 
-  const role       = currentUser.role
-  const items      = NAV[role] || []
-  const unreadN    = getUnreadNotifCount(currentUser.id)
+  const role  = currentUser.role
+  const items = NAV[role] || []
 
   // Mini-stats pour le résumé sidebar
   const engagements   = getUserEngagements(currentUser.id, role) || []
@@ -85,7 +75,6 @@ export default function DashboardSidebar() {
   const resumeRows = RESUME_ROWS[role] || []
 
   const isActive = (href) => pathname === href
-
   const handleLogout = () => { logout(); router.push('/') }
 
   return (
@@ -137,24 +126,6 @@ export default function DashboardSidebar() {
             {label}
           </Link>
         ))}
-
-        {/* Notifications */}
-        <Link
-          href="/notifications"
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            isActive('/notifications')
-              ? 'bg-white/22 text-white'
-              : 'text-white/60 hover:bg-white/10 hover:text-white'
-          }`}
-        >
-          <Bell size={17} className="flex-shrink-0" />
-          Notifications
-          {unreadN > 0 && (
-            <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
-              {unreadN > 9 ? '9+' : unreadN}
-            </span>
-          )}
-        </Link>
       </nav>
 
       {/* RÉSUMÉ mini-stats */}

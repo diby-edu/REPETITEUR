@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 import { CITIES, LEVELS } from '../data/constants'
 import Avatar from '../components/common/Avatar'
+import DashboardLayout from '../components/layout/DashboardLayout'
 import {
   User, Lock, Bell, Trash2, Save, Eye, EyeOff,
   LogOut, Clock, FileText, Camera, RefreshCw, Plus, Upload,
@@ -282,7 +283,8 @@ export default function SettingsPage() {
   const diplomaCount = docs.diplomes?.length || 0
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
+    <div className="bg-surface">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <h1 className="font-display text-2xl font-bold text-gray-900 mb-6">Paramètres</h1>
 
@@ -808,5 +810,6 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   )
 }

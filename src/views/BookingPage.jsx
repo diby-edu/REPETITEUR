@@ -7,6 +7,7 @@ import Avatar from '../components/common/Avatar'
 import { StatusBadge } from '../components/common/Badge'
 import { Calendar, Clock, MapPin, CheckCircle, XCircle, Star, ChevronRight, MessageCircle } from 'lucide-react'
 import { formatDateShort, formatTime, getLocationLabel } from '../utils/helpers'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 const TABS = ['À venir', 'En attente', 'Terminées', 'Annulées']
 
@@ -50,7 +51,8 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
+    <DashboardLayout>
+    <div className="bg-surface">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <h1 className="font-display text-2xl font-bold text-gray-900 mb-6">
           Mes réservations
@@ -231,5 +233,6 @@ export default function BookingPage() {
         )}
       </div>
     </div>
+    </DashboardLayout>
   )
 }

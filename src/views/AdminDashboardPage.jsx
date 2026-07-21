@@ -216,7 +216,6 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <button className="btn-outline text-sm">Exporter CSV</button>
-            <button className="btn-outline text-sm">Paramètres</button>
           </div>
         </div>
 

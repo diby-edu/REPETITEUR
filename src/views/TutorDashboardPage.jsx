@@ -86,7 +86,7 @@ export default function TutorDashboardPage() {
     if (!tutor?.city) return
     supabase
       .from('profiles')
-      .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_level, join_date')
+      .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_levels, join_date')
       .eq('role', 'parent')
       .eq('open_to_contact', true)
       .eq('city', tutor.city)
@@ -99,7 +99,7 @@ export default function TutorDashboardPage() {
           : data
         setMatchingParents(filtered.map(p => ({
           id: p.id, firstName: p.first_name, lastName: p.last_name, city: p.city,
-          avatarColor: p.avatar_color, childLevel: p.child_level,
+          avatarColor: p.avatar_color, childLevels: p.child_levels || [],
           subjectsNeeded: p.subjects_needed || [], joinDate: p.join_date,
         })))
       })
@@ -621,10 +621,10 @@ export default function TutorDashboardPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    {par.childLevel && (
+                    {par.childLevels?.length > 0 && (
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <GraduationCap size={13} className="text-secondary flex-shrink-0" />
-                        <span>Niveau : <strong>{par.childLevel}</strong></span>
+                        <span>Niveau : <strong>{par.childLevels.join(', ')}</strong></span>
                       </div>
                     )}
                     {par.subjectsNeeded?.length > 0 && (

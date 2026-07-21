@@ -188,9 +188,6 @@ export default function TutorDashboardPage() {
     .filter(s => !isDatePast(s.scheduledDate))
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''))
     .slice(0, 5)
-  const thisWeekSessions    = allSessions
-    .filter(s => isThisWeek(s.scheduledDate))
-    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.scheduledTime.localeCompare(b.scheduledTime))
   const currentMonth      = new Date().toISOString().slice(0, 7)
   const monthSessionCount = allSessions.filter(s => s.scheduledDate?.startsWith(currentMonth)).length
   const unreadMessages    = conversations.reduce((sum, c) => sum + (c.unreadCount?.[tutor?.id] || 0), 0)

@@ -442,7 +442,7 @@ export default function ParentDashboardPage() {
                         <p className="text-sm font-medium text-gray-800">{e.subject} — {t?.firstName} {t?.lastName}</p>
                         <p className="text-xs text-gray-500">
                           {e.status === 'active'
-                            ? (days === 0 ? "Se termine aujourd'hui" : `Se termine dans ${days} j`)
+                            ? (days < 0 ? 'Contrat expiré (renouvellement en attente)' : days === 0 ? "Se termine aujourd'hui" : `Se termine dans ${days} j`)
                             : "En attente d'acceptation du répétiteur"}
                         </p>
                       </div>

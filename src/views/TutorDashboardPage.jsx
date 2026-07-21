@@ -14,7 +14,7 @@ import {
   Check, X,
 } from 'lucide-react'
 import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } from '../utils/helpers'
-import DashboardLayout from '../components/layout/DashboardLayout'
+import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR      = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -53,6 +53,7 @@ export default function TutorDashboardPage() {
     runMaintenanceTasks,
   } = useApp()
   const { openChat } = useChatBubble()
+  const { setSlot } = useHeaderSlot()
   const tutor = currentUser
 
   const [matchingParents, setMatchingParents]       = useState([])
@@ -69,6 +70,16 @@ export default function TutorDashboardPage() {
   const [payLoading, setPayLoading]         = useState(false)
 
   const fetchedPartnerIds = useRef(new Set())
+
+  useEffect(() => {
+    if (!tutor?.id) return
+    setSlot(
+      <Link href={`/repetiteur/${tutor.id}`} className="btn-outline text-sm flex items-center gap-2">
+        <Eye size={16} /> Voir mon profil public
+      </Link>
+    )
+    return () => setSlot(null)
+  }, [tutor?.id])
 
   // ── Load on mount ────────────────────────────────────────────
   useEffect(() => {
@@ -214,26 +225,21 @@ export default function TutorDashboardPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Avatar user={tutor} size="lg" />
-            <div>
-              <h1 className="font-display text-2xl font-bold text-gray-900">Bonjour, {tutor.firstName} !</h1>
-              <div className="flex items-center gap-2 mt-1">
-                {isVerified && <VerifiedBadge />}
-                {isPremium && <PremiumBadge />}
-                {!isVerified && tutor.verificationStatus === 'pending' && (
-                  <span className="badge-pending"><Clock size={12} />En attente de vérification</span>
-                )}
-                {tutor.verificationStatus === 'rejected' && (
-                  <span className="badge-rejected">Dossier rejeté</span>
-                )}
-              </div>
+        <div className="flex items-center gap-4 mb-8">
+          <Avatar user={tutor} size="lg" />
+          <div>
+            <h1 className="font-display text-2xl font-bold text-gray-900">Bonjour, {tutor.firstName} !</h1>
+            <div className="flex items-center gap-2 mt-1">
+              {isVerified && <VerifiedBadge />}
+              {isPremium && <PremiumBadge />}
+              {!isVerified && tutor.verificationStatus === 'pending' && (
+                <span className="badge-pending"><Clock size={12} />En attente de vérification</span>
+              )}
+              {tutor.verificationStatus === 'rejected' && (
+                <span className="badge-rejected">Dossier rejeté</span>
+              )}
             </div>
           </div>
-          <Link href={`/repetiteur/${tutor.id}`} className="btn-outline text-sm flex items-center gap-2">
-            <Eye size={16} /> Voir mon profil public
-          </Link>
         </div>
 
         {/* Alerts */}

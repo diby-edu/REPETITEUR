@@ -9,7 +9,11 @@ import Toast from './common/Toast'
 import ChatBubble from './chat/ChatBubble'
 import { useApp } from '../context/AppContext'
 
-const DASHBOARD_PREFIXES = ['/tableau-de-bord', '/admin']
+const DASHBOARD_PREFIXES = [
+  '/tableau-de-bord', '/admin',
+  '/messagerie', '/reservations', '/favoris',
+  '/notifications', '/parametres', '/abonnement',
+]
 
 function ToastWrapper() {
   const { toast } = useApp()

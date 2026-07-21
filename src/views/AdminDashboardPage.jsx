@@ -8,12 +8,12 @@ import StarRating from '../components/common/StarRating'
 import {
   Users, GraduationCap, Calendar, TrendingUp, ShieldCheck,
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
-  BarChart3, FileText, ExternalLink, Wallet,
+  BarChart3, FileText, ExternalLink, Wallet, Star,
 } from 'lucide-react'
 import { formatDateShort, formatFCFA } from '../utils/helpers'
-import DashboardLayout from '../components/layout/DashboardLayout'
+import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
-const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats']
+const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats', 'Paiements', 'Avis']
 const TODAY = new Date().toISOString().split('T')[0]
 
 // Week / month boundaries (computed once at module load)
@@ -28,6 +28,7 @@ const MONTH_START = new Date(_now.getFullYear(), _now.getMonth(), 1).toISOString
 
 export default function AdminDashboardPage() {
   const { tutors, validateTutor, suspendTutor, showToast, reloadTutors } = useApp()
+  const { setSlot } = useHeaderSlot()
   const [activeTab, setActiveTab]     = useState('Vue globale')
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -39,6 +40,13 @@ export default function AdminDashboardPage() {
   const [sessionStats, setSessionStats] = useState({ upcoming: 0, toConfirm: 0, reported: 0 })
   const [payStats, setPayStats]         = useState({ pendingDecl: 0, confirmed: 0 })
   const [recentEngagements, setRecentEngagements] = useState([])
+  const [paymentsList, setPaymentsList] = useState([])
+  const [reviewsList, setReviewsList]   = useState([])
+
+  useEffect(() => {
+    setSlot(<button className="btn-outline text-sm">Exporter CSV</button>)
+    return () => setSlot(null)
+  }, [])
   const [weekStats, setWeekStats]       = useState({ tutors: 0, parents: 0, engagements: 0, sessions: 0 })
   const [monthSessionCount, setMonthSessionCount] = useState(0)
   const [parentMonthCount, setParentMonthCount]   = useState(0)
@@ -132,6 +140,52 @@ export default function AdminDashboardPage() {
     return () => { supabase.removeChannel(channel) }
   }, [reloadTutors])
 
+  // ── Load Paiements tab ───────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'Paiements') return
+    supabase.from('payments').select('*').order('created_at', { ascending: false }).limit(100)
+      .then(async ({ data: pmts }) => {
+        if (!pmts?.length) { setPaymentsList([]); return }
+        const engIds = [...new Set(pmts.map(p => p.engagement_id).filter(Boolean))]
+        const { data: engs } = engIds.length
+          ? await supabase.from('engagements').select('id, subject, parent_id, tutor_id, monthly_rate').in('id', engIds)
+          : { data: [] }
+        const allIds = [...new Set((engs || []).flatMap(e => [e.parent_id, e.tutor_id]).filter(Boolean))]
+        const { data: profiles } = allIds.length
+          ? await supabase.from('profiles').select('id, first_name, last_name').in('id', allIds)
+          : { data: [] }
+        const pMap = {}
+        profiles?.forEach(p => { pMap[p.id] = `${p.first_name} ${p.last_name}` })
+        const eMap = {}
+        engs?.forEach(e => { eMap[e.id] = { ...e, parentName: pMap[e.parent_id] || '—', tutorName: pMap[e.tutor_id] || '—' } })
+        setPaymentsList(pmts.map(p => ({ ...p, engagement: eMap[p.engagement_id] })))
+      })
+  }, [activeTab])
+
+  // ── Load Avis tab ────────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'Avis') return
+    supabase.from('reviews').select('*').order('created_at', { ascending: false }).limit(200)
+      .then(async ({ data: revs }) => {
+        if (!revs?.length) { setReviewsList([]); return }
+        const ids = [...new Set([...revs.map(r => r.reviewer_id), ...revs.map(r => r.tutor_id)].filter(Boolean))]
+        const { data: profiles } = ids.length
+          ? await supabase.from('profiles').select('id, first_name, last_name').in('id', ids)
+          : { data: [] }
+        const pMap = {}
+        profiles?.forEach(p => { pMap[p.id] = `${p.first_name} ${p.last_name}` })
+        setReviewsList(revs.map(r => ({ ...r, reviewerName: pMap[r.reviewer_id] || '—', tutorName: pMap[r.tutor_id] || '—' })))
+      })
+  }, [activeTab])
+
+  const deleteReview = async (reviewId) => {
+    const { error } = await supabase.from('reviews').delete().eq('id', reviewId)
+    if (!error) {
+      setReviewsList(prev => prev.filter(r => r.id !== reviewId))
+      showToast('Avis supprimé.', 'success')
+    }
+  }
+
   // ── Document viewer ──────────────────────────────────────────
   const viewDocument = useCallback(async (path) => {
     if (!path) return
@@ -207,16 +261,11 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="font-display text-xl font-bold text-gray-900">Administration 🛡️</h1>
-            <p className="text-gray-400 text-sm mt-0.5">
-              MonRépétiteur · Tableau de bord · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="btn-outline text-sm">Exporter CSV</button>
-          </div>
+        <div className="mb-6">
+          <h1 className="font-display text-xl font-bold text-gray-900">Administration 🛡️</h1>
+          <p className="text-gray-400 text-sm mt-0.5">
+            MonRépétiteur · Tableau de bord · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
         </div>
 
         {/* KPIs */}
@@ -730,6 +779,109 @@ export default function AdminDashboardPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Tab: Paiements ──────────────────────────────────── */}
+        {activeTab === 'Paiements' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Déclarations de paiement ({paymentsList.length})</h3>
+              {payStats.pendingDecl > 0 && (
+                <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full">
+                  {payStats.pendingDecl} en attente de confirmation
+                </span>
+              )}
+            </div>
+            {paymentsList.length === 0 ? (
+              <div className="card text-center py-12">
+                <Wallet size={40} className="text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">Aucune déclaration de paiement</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {paymentsList.map(p => (
+                  <div key={p.id} className="card flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-gray-800 text-sm">
+                          {p.engagement?.subject || 'Matière inconnue'}
+                        </p>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          p.status === 'confirmed'       ? 'bg-green-100 text-green-700' :
+                          p.status === 'parent_declared' ? 'bg-orange-100 text-orange-700' :
+                          'bg-gray-100 text-gray-500'
+                        }`}>
+                          {p.status === 'confirmed' ? 'Confirmé' : p.status === 'parent_declared' ? 'En attente' : p.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Parent : {p.engagement?.parentName} · Répétiteur : {p.engagement?.tutorName}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {formatFCFA(p.amount || p.engagement?.monthly_rate || 0)} · {p.payment_method || '—'} · {formatDateShort(p.created_at)}
+                      </p>
+                    </div>
+                    {p.status === 'parent_declared' && (
+                      <button
+                        onClick={async () => {
+                          const { error } = await supabase.from('payments').update({ status: 'confirmed' }).eq('id', p.id)
+                          if (!error) {
+                            setPaymentsList(prev => prev.map(x => x.id === p.id ? { ...x, status: 'confirmed' } : x))
+                            showToast('Paiement confirmé.', 'success')
+                          }
+                        }}
+                        className="flex-shrink-0 text-xs font-bold text-white bg-green-500 hover:bg-green-600 px-4 py-2 rounded-xl whitespace-nowrap"
+                      >
+                        Confirmer
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Avis ───────────────────────────────────────── */}
+        {activeTab === 'Avis' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Avis des parents ({reviewsList.length})</h3>
+            </div>
+            {reviewsList.length === 0 ? (
+              <div className="card text-center py-12">
+                <Star size={40} className="text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">Aucun avis pour l'instant</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {reviewsList.map(r => (
+                  <div key={r.id} className="card flex items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="font-medium text-gray-800 text-sm">{r.reviewerName}</p>
+                        <span className="text-gray-400 text-xs">→</span>
+                        <p className="text-sm text-primary font-medium">{r.tutorName}</p>
+                        <div className="flex">
+                          {[1,2,3,4,5].map(n => (
+                            <span key={n} className={`text-sm ${n <= r.rating ? 'text-accent' : 'text-gray-200'}`}>★</span>
+                          ))}
+                        </div>
+                      </div>
+                      {r.comment && <p className="text-sm text-gray-600 italic">"{r.comment}"</p>}
+                      <p className="text-xs text-gray-400 mt-1">{formatDateShort(r.created_at)}</p>
+                    </div>
+                    <button
+                      onClick={() => deleteReview(r.id)}
+                      className="flex-shrink-0 text-xs font-semibold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
 import {
-  LayoutDashboard, Calendar, Settings, BookOpen, LogOut, Users, ShieldCheck,
+  LayoutDashboard, Calendar, BookOpen, LogOut, Users, ShieldCheck,
 } from 'lucide-react'
 
 const NAV = {
@@ -17,7 +17,6 @@ const NAV = {
   parent: [
     { label: 'Tableau de bord', href: '/tableau-de-bord/parent', icon: LayoutDashboard },
     { label: 'Séances',         href: '/reservations',           icon: Calendar },
-    { label: 'Paramètres',      href: '/parametres',             icon: Settings },
   ],
   admin: [
     { label: 'Tableau de bord', href: '/admin',      icon: LayoutDashboard },

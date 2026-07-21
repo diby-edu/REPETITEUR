@@ -34,8 +34,8 @@ export default function SearchPage() {
       const q = filters.query.toLowerCase()
       result = result.filter(t =>
         `${t.firstName} ${t.lastName}`.toLowerCase().includes(q) ||
-        t.subjects.some(s => s.toLowerCase().includes(q)) ||
-        t.bio.toLowerCase().includes(q)
+        t.subjects?.some(s => s.toLowerCase().includes(q)) ||
+        t.bio?.toLowerCase().includes(q)
       )
     }
     if (filters.city) result = result.filter(t => t.city.toLowerCase().includes(filters.city.toLowerCase()))

@@ -13,7 +13,7 @@ import {
   Users, Send, MapPin, Star,
 } from 'lucide-react'
 import { formatFCFA } from '../utils/helpers'
-import DashboardLayout from '../components/layout/DashboardLayout'
+import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -59,6 +59,7 @@ export default function ParentDashboardPage() {
     reportSession, declarePayment, runMaintenanceTasks,
   } = useApp()
   const { openChat } = useChatBubble()
+  const { setSlot } = useHeaderSlot()
   const parent = currentUser
 
   // ── Session report modal ────────────────────────────────────
@@ -80,6 +81,15 @@ export default function ParentDashboardPage() {
   const [wantsContinue, setWantsContinue] = useState(null)
   const [payConfirm, setPayConfirm]       = useState(false)
   const [payLoading, setPayLoading]       = useState(false)
+
+  useEffect(() => {
+    setSlot(
+      <Link href="/recherche" className="btn-primary text-sm flex items-center gap-2">
+        <Search size={15} /> Trouver un répétiteur
+      </Link>
+    )
+    return () => setSlot(null)
+  }, [])
 
   useEffect(() => {
     if (!parent?.id) return
@@ -208,18 +218,12 @@ export default function ParentDashboardPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="font-display text-xl font-bold text-gray-900">Bonjour, {parent.firstName} 👋</h1>
-            <p className="text-gray-400 text-sm mt-0.5">
-              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              {upcomingSessions.length > 0 && ` — ${upcomingSessions.length} séance${upcomingSessions.length > 1 ? 's' : ''} planifiée${upcomingSessions.length > 1 ? 's' : ''}`}
-            </p>
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <Link href="/favoris" className="btn-outline text-sm flex items-center gap-2"><Heart size={15} /> Mes favoris</Link>
-            <Link href="/recherche" className="btn-primary text-sm flex items-center gap-2"><Search size={15} /> + Trouver un répétiteur</Link>
-          </div>
+        <div className="mb-6">
+          <h1 className="font-display text-xl font-bold text-gray-900">Bonjour, {parent.firstName} 👋</h1>
+          <p className="text-gray-400 text-sm mt-0.5">
+            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {upcomingSessions.length > 0 && ` — ${upcomingSessions.length} séance${upcomingSessions.length > 1 ? 's' : ''} planifiée${upcomingSessions.length > 1 ? 's' : ''}`}
+          </p>
         </div>
 
         {/* Alerts */}

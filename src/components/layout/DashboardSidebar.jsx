@@ -79,7 +79,7 @@ export default function DashboardSidebar() {
       { label: 'Répétiteurs vérifiés', value: verifiedT.length },
       { label: 'En attente',           value: pendingT.length },
       { label: 'Abonnements actifs',   value: tutors?.filter(t => t.subscription?.status === 'active').length || 0 },
-      { label: 'Séances ce mois',      value: monthSessions.length },
+      { label: 'Total répétiteurs',    value: tutors?.length || 0 },
     ],
   }
   const resumeRows = RESUME_ROWS[role] || []

@@ -16,6 +16,16 @@ import DashboardLayout from '../components/layout/DashboardLayout'
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats']
 const TODAY = new Date().toISOString().split('T')[0]
 
+// Week / month boundaries (computed once at module load)
+const _now = new Date()
+const _dow = _now.getDay() // 0=dim
+const _weekStart = new Date(_now)
+_weekStart.setDate(_now.getDate() - (_dow === 0 ? 6 : _dow - 1))
+_weekStart.setHours(0, 0, 0, 0)
+const WEEK_START  = _weekStart.toISOString().split('T')[0]
+const WEEK_END    = new Date(_weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+const MONTH_START = new Date(_now.getFullYear(), _now.getMonth(), 1).toISOString().split('T')[0]
+
 export default function AdminDashboardPage() {
   const { tutors, validateTutor, suspendTutor, showToast, reloadTutors } = useApp()
   const [activeTab, setActiveTab]     = useState('Vue globale')
@@ -29,6 +39,9 @@ export default function AdminDashboardPage() {
   const [sessionStats, setSessionStats] = useState({ upcoming: 0, toConfirm: 0, reported: 0 })
   const [payStats, setPayStats]         = useState({ pendingDecl: 0, confirmed: 0 })
   const [recentEngagements, setRecentEngagements] = useState([])
+  const [weekStats, setWeekStats]       = useState({ tutors: 0, parents: 0, engagements: 0, sessions: 0 })
+  const [monthSessionCount, setMonthSessionCount] = useState(0)
+  const [parentMonthCount, setParentMonthCount]   = useState(0)
 
   // ── Load data ────────────────────────────────────────────────
   useEffect(() => {
@@ -66,6 +79,27 @@ export default function AdminDashboardPage() {
       supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'parent_declared'),
       supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'confirmed'),
     ]).then(([pd, c]) => setPayStats({ pendingDecl: pd.count || 0, confirmed: c.count || 0 }))
+
+    // Séances ce mois (filtré par mois en cours)
+    supabase.from('sessions').select('*', { count: 'exact', head: true })
+      .gte('scheduled_date', MONTH_START)
+      .then(({ count }) => setMonthSessionCount(count || 0))
+
+    // Parents inscrits ce mois
+    supabase.from('profiles').select('*', { count: 'exact', head: true })
+      .eq('role', 'parent').gte('join_date', MONTH_START)
+      .then(({ count }) => setParentMonthCount(count || 0))
+
+    // Stats de la semaine courante
+    Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'tutor').gte('join_date', WEEK_START),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'parent').gte('join_date', WEEK_START),
+      supabase.from('engagements').select('*', { count: 'exact', head: true }).gte('created_at', WEEK_START),
+      supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_date', WEEK_START).lte('scheduled_date', WEEK_END),
+    ]).then(([wt, wp, we, ws]) => setWeekStats({
+      tutors: wt.count || 0, parents: wp.count || 0,
+      engagements: we.count || 0, sessions: ws.count || 0,
+    }))
 
     // Recent engagements (with tutor + parent profiles)
     supabase
@@ -132,9 +166,9 @@ export default function AdminDashboardPage() {
 
   const totalMonthlyRevenue = (standardSubs.length * 3000) + (premiumSubs.length * 5000)
   const stats = [
-    { label: 'Répétiteurs actifs', value: verified.length,             emoji: '🎓', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: `${tutors.length} inscrits · ${pending.length} en attente`, deltaClass: 'text-gray-400' },
-    { label: 'Parents inscrits',   value: parents.length,              emoji: '👨‍👩‍👧', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '↑ en hausse ce mois',                                    deltaClass: 'text-green-600' },
-    { label: 'Séances ce mois',    value: totalSessions,               emoji: '📅', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionStats.toConfirm > 0 ? `${sessionStats.toConfirm} à confirmer` : '→ stable', deltaClass: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-400' },
+    { label: 'Répétiteurs actifs', value: verified.length,       emoji: '🎓', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: `${tutors.length} inscrits · ${pending.length} en attente`, deltaClass: 'text-gray-400' },
+    { label: 'Parents inscrits',   value: parents.length,        emoji: '👨‍👩‍👧', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: parentMonthCount > 0 ? `+${parentMonthCount} ce mois` : '→ stable', deltaClass: parentMonthCount > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Séances ce mois',    value: monthSessionCount,     emoji: '📅', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionStats.toConfirm > 0 ? `${sessionStats.toConfirm} à confirmer` : '→ stable', deltaClass: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-400' },
     { label: 'CA FCFA (mois)',     value: totalMonthlyRevenue > 0 ? totalMonthlyRevenue.toLocaleString('fr-FR') : '0', emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: totalMonthlyRevenue >= 100000, delta: `${activeSubscriptions.length} abonnements actifs`, deltaClass: 'text-green-600' },
   ]
 
@@ -244,10 +278,10 @@ export default function AdminDashboardPage() {
             <h2 className="text-sm font-bold text-gray-900 mb-4">📊 Cette semaine</h2>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { label: 'Répétiteurs', value: `+${pending.length}`,           bg: 'bg-primary-50',   color: 'text-primary' },
-                { label: 'Parents',     value: `+${Math.max(0, parents.length - 10)}`, bg: 'bg-secondary-50', color: 'text-secondary' },
-                { label: 'Contrats',    value: `+${engStats.active}`,          bg: 'bg-green-50',     color: 'text-green-600' },
-                { label: 'Séances',     value: `+${sessionStats.upcoming}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
+                { label: 'Répétiteurs', value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
+                { label: 'Parents',     value: `+${weekStats.parents}`,     bg: 'bg-secondary-50', color: 'text-secondary' },
+                { label: 'Contrats',    value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
+                { label: 'Séances',     value: `+${weekStats.sessions}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
               ].map(item => (
                 <div key={item.label} className={`${item.bg} rounded-xl p-4 text-center`}>
                   <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>

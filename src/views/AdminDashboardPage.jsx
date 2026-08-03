@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import Avatar from '../components/common/Avatar'
@@ -31,10 +31,14 @@ export default function AdminDashboardPage() {
   const { tutors, validateTutor, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => {
-    const t = searchParams.get('tab')
-    return t && TABS.includes(t) ? t : 'Vue globale'
-  })
+  const router = useRouter()
+  // Derive activeTab directly from URL — no state needed, always in sync
+  const rawTab = searchParams.get('tab')
+  const activeTab = rawTab && TABS.includes(rawTab) ? rawTab : 'Vue globale'
+  const switchTab = (tab) => {
+    if (tab === 'Vue globale') router.push('/admin')
+    else router.push('/admin?tab=' + encodeURIComponent(tab))
+  }
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [userFilter, setUserFilter]   = useState('')
@@ -47,13 +51,6 @@ export default function AdminDashboardPage() {
   const [recentEngagements, setRecentEngagements] = useState([])
   const [paymentsList, setPaymentsList] = useState([])
   const [reviewsList, setReviewsList]   = useState([])
-
-  // Sync tab with URL param when navigating from sidebar
-  useEffect(() => {
-    const t = searchParams.get('tab')
-    if (t && TABS.includes(t)) setActiveTab(t)
-    else if (!t) setActiveTab('Vue globale')
-  }, [searchParams])
 
   useEffect(() => {
     setSlot(<button className="btn-outline text-sm" onClick={exportCSV}>Exporter CSV</button>)
@@ -356,7 +353,7 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-semibold text-gray-900">{pending.length} vérification{pending.length > 1 ? 's' : ''} CNI en attente</p>
                       <p className="text-xs text-gray-400 truncate">{pending.slice(0, 3).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
                     </div>
-                    <button onClick={() => setActiveTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
+                    <button onClick={() => switchTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
                   </div>
                 )}
                 {sessionStats.toConfirm > 0 && (
@@ -366,7 +363,7 @@ export default function AdminDashboardPage() {
                       <p className="text-sm font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
                       <p className="text-xs text-gray-400">En attente de confirmation parent</p>
                     </div>
-                    <button onClick={() => setActiveTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
+                    <button onClick={() => switchTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
                   </div>
                 )}
               </div>
@@ -419,7 +416,7 @@ export default function AdminDashboardPage() {
           {TABS.map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => switchTab(tab)}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
                 activeTab === tab ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'
               }`}

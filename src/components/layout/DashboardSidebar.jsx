@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
@@ -19,9 +19,9 @@ const NAV = {
     { label: 'Séances',         href: '/reservations',           icon: Calendar },
   ],
   admin: [
-    { label: 'Tableau de bord', href: '/admin',      icon: LayoutDashboard },
-    { label: 'Utilisateurs',    href: '/admin',      icon: Users },
-    { label: 'Vérifications',   href: '/admin',      icon: ShieldCheck },
+    { label: 'Tableau de bord', href: '/admin',                      icon: LayoutDashboard },
+    { label: 'Utilisateurs',    href: '/admin?tab=Utilisateurs',     icon: Users },
+    { label: 'Vérifications',   href: '/admin?tab=Vérifications',    icon: ShieldCheck },
   ],
 }
 
@@ -30,8 +30,9 @@ const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Administr
 export default function DashboardSidebar() {
   const { currentUser, logout } = useAuth()
   const { getUserEngagements, getAllUserSessions, getUserConversations, tutors } = useApp()
-  const pathname = usePathname()
-  const router   = useRouter()
+  const pathname    = usePathname()
+  const router      = useRouter()
+  const searchParams = useSearchParams()
 
   if (!currentUser) return null
 
@@ -73,7 +74,15 @@ export default function DashboardSidebar() {
   }
   const resumeRows = RESUME_ROWS[role] || []
 
-  const isActive = (href) => pathname === href
+  const isActive = (href) => {
+    if (!href.includes('?')) {
+      // base route: active only when no tab param
+      return pathname === href && !searchParams.get('tab')
+    }
+    const [path, qs] = href.split('?')
+    if (pathname !== path) return false
+    return searchParams.get('tab') === new URLSearchParams(qs).get('tab')
+  }
   const handleLogout = () => { logout(); router.push('/') }
 
   return (

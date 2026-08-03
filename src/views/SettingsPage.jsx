@@ -254,14 +254,24 @@ export default function SettingsPage() {
         : [...prev.childLevels, l],
     }))
 
-  const [notifications, setNotifications] = useState({
+  const [notifications, setNotifications] = useState(() => ({
     newMessage: true,
     bookingRequest: true,
     bookingUpdate: true,
     reviewReceived: true,
     subscriptionExpiry: true,
     profileViews: false,
-  })
+    ...(currentUser?.notificationPreferences || {}),
+  }))
+
+  const handleSaveNotifications = async () => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ notification_preferences: notifications })
+      .eq('id', currentUser.id)
+    if (error) { showToast('Erreur lors de la sauvegarde.', 'error'); return }
+    showToast('Préférences enregistrées !')
+  }
 
   const handleSaveProfile = (e) => {
     e.preventDefault()
@@ -271,10 +281,28 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000)
   }
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
+    const userId = currentUser?.id
+    if (!userId) return
+    // Anonymise le profil puis supprime le compte auth via edge function
+    await supabase.from('profiles').update({
+      first_name: 'Utilisateur', last_name: 'Supprimé',
+      email: `deleted_${userId}@deleted.local`, phone: null,
+    }).eq('id', userId)
+    // Marquer le tutor comme inactif si applicable
+    if (currentUser.role === 'tutor') {
+      await supabase.from('tutors').update({ is_active: false, suspended: true }).eq('id', userId)
+    }
+    // Appel à la Supabase Edge Function pour supprimer le compte Auth
+    const { error } = await supabase.functions.invoke('delete-account', { body: { userId } })
+    if (error) {
+      // Fallback : on déconnecte quand même — l'admin devra supprimer manuellement
+      showToast('Données anonymisées. Déconnexion en cours.', 'info')
+    } else {
+      showToast('Compte supprimé définitivement.', 'info')
+    }
     logout()
     router.push('/')
-    showToast('Compte supprimé. À bientôt !', 'info')
   }
 
   const docs = currentUser?.documents || {}
@@ -801,7 +829,7 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => showToast('Préférences enregistrées !')} className="btn-primary mt-4 text-sm">
+                <button onClick={handleSaveNotifications} className="btn-primary mt-4 text-sm">
                   Enregistrer
                 </button>
               </div>

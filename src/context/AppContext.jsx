@@ -256,6 +256,13 @@ export function AppProvider({ children }) {
     showToast('Compte suspendu.')
   }, [showToast])
 
+  const unsuspendTutor = useCallback(async (tutorId) => {
+    const { error } = await supabase.from('tutors').update({ is_active: true, suspended: false }).eq('id', tutorId)
+    if (error) { showToast('Erreur.', 'error'); return }
+    setTutors(prev => prev.map(t => t.id !== tutorId ? t : { ...t, isActive: true, suspended: false }))
+    showToast('Compte réactivé.')
+  }, [showToast])
+
   const updateTutorAvailability = useCallback(async (tutorId, availability) => {
     const { error } = await supabase.from('tutors').update({ availability }).eq('id', tutorId)
     if (error) { showToast('Erreur.', 'error'); return }
@@ -886,7 +893,7 @@ export function AppProvider({ children }) {
 
       // Tuteurs
       getTutor, getActiveTutors, getPendingTutors, reloadTutors,
-      validateTutor, updateTutorSubscription, suspendTutor, updateTutorAvailability,
+      validateTutor, updateTutorSubscription, suspendTutor, unsuspendTutor, updateTutorAvailability,
 
       // Conversations & messages
       getConversation, getUserConversations, getOrCreateConversation,

@@ -35,6 +35,7 @@ export function AuthProvider({ children }) {
       childLevel: profile.child_level || null,
       childLevels: profile.child_levels || [],
       openToContact: profile.open_to_contact !== false,
+      notificationPreferences: profile.notification_preferences || null,
       // Données tutor
       ...(tutor && {
         bio: tutor.bio,

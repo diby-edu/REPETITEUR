@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '../lib/supabase'
 import { useApp } from '../context/AppContext'
 import Avatar from '../components/common/Avatar'
@@ -27,9 +28,13 @@ const WEEK_END    = new Date(_weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toI
 const MONTH_START = new Date(_now.getFullYear(), _now.getMonth(), 1).toISOString().split('T')[0]
 
 export default function AdminDashboardPage() {
-  const { tutors, validateTutor, suspendTutor, showToast, reloadTutors } = useApp()
+  const { tutors, validateTutor, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
-  const [activeTab, setActiveTab]     = useState('Vue globale')
+  const searchParams = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get('tab')
+    return t && TABS.includes(t) ? t : 'Vue globale'
+  })
   const [rejectModal, setRejectModal] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [userFilter, setUserFilter]   = useState('')
@@ -43,8 +48,15 @@ export default function AdminDashboardPage() {
   const [paymentsList, setPaymentsList] = useState([])
   const [reviewsList, setReviewsList]   = useState([])
 
+  // Sync tab with URL param when navigating from sidebar
   useEffect(() => {
-    setSlot(<button className="btn-outline text-sm">Exporter CSV</button>)
+    const t = searchParams.get('tab')
+    if (t && TABS.includes(t)) setActiveTab(t)
+    else if (!t) setActiveTab('Vue globale')
+  }, [searchParams])
+
+  useEffect(() => {
+    setSlot(<button className="btn-outline text-sm" onClick={exportCSV}>Exporter CSV</button>)
     return () => setSlot(null)
   }, [])
   const [weekStats, setWeekStats]       = useState({ tutors: 0, parents: 0, engagements: 0, sessions: 0 })
@@ -177,6 +189,46 @@ export default function AdminDashboardPage() {
         setReviewsList(revs.map(r => ({ ...r, reviewerName: pMap[r.reviewer_id] || '—', tutorName: pMap[r.tutor_id] || '—' })))
       })
   }, [activeTab])
+
+  // ── CSV Export ───────────────────────────────────────────────
+  const exportCSV = async () => {
+    showToast('Génération du CSV…', 'info')
+    const [{ data: engs }, { data: profs }, { data: subs }] = await Promise.all([
+      supabase.from('engagements').select('id, status, subject, monthly_rate, start_date, end_date, created_at, parent_id, tutor_id'),
+      supabase.from('profiles').select('id, first_name, last_name, email, role, city, join_date'),
+      supabase.from('tutors').select('id, subscription_plan, subscription_status, rating, is_active, verification_status'),
+    ])
+    const profileMap = {}
+    profs?.forEach(p => { profileMap[p.id] = p })
+    const subMap = {}
+    subs?.forEach(s => { subMap[s.id] = s })
+
+    const rows = [
+      ['ID contrat', 'Statut', 'Matière', 'Tarif mensuel (FCFA)', 'Début', 'Fin', 'Parent', 'Email parent', 'Répétiteur', 'Email répétiteur', 'Ville', 'Créé le'],
+      ...(engs || []).map(e => {
+        const parent = profileMap[e.parent_id]
+        const tutor  = profileMap[e.tutor_id]
+        return [
+          e.id, e.status, e.subject, e.monthly_rate,
+          e.start_date, e.end_date,
+          parent ? `${parent.first_name} ${parent.last_name}` : '',
+          parent?.email || '',
+          tutor  ? `${tutor.first_name} ${tutor.last_name}`  : '',
+          tutor?.email || '',
+          parent?.city || tutor?.city || '',
+          e.created_at?.slice(0, 10),
+        ]
+      }),
+    ]
+
+    const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = Object.assign(document.createElement('a'), { href: url, download: `monrepetiteur_contrats_${new Date().toISOString().slice(0,10)}.csv` })
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('CSV téléchargé.', 'success')
+  }
 
   const deleteReview = async (reviewId) => {
     const { error } = await supabase.from('reviews').delete().eq('id', reviewId)
@@ -619,7 +671,14 @@ export default function AdminDashboardPage() {
                         Suspendre
                       </button>
                     )}
-                    {user.suspended && <span className="text-xs text-red-500 font-medium px-2 py-1">Suspendu</span>}
+                    {user.role === 'tutor' && user.suspended && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-red-500 font-semibold">Suspendu</span>
+                        <button onClick={() => unsuspendTutor(user.id)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50">
+                          Réactiver
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

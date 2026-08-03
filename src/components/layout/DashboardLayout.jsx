@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useContext, createContext, useMemo } from 'react'
+import { useState, useEffect, useContext, createContext, useMemo, Suspense } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../../context/AuthContext'
@@ -70,7 +70,9 @@ export default function DashboardLayout({ children }) {
   return (
     <HeaderCtx.Provider value={ctx}>
       <div className="flex h-screen overflow-hidden bg-surface">
-        <DashboardSidebar />
+        <Suspense fallback={<div className="w-60 flex-shrink-0" style={{ background: 'linear-gradient(180deg,#1B4332 0%,#2D6A4F 100%)' }} />}>
+          <DashboardSidebar />
+        </Suspense>
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="h-14 flex-shrink-0 flex items-center justify-between gap-3 px-6 border-b border-gray-100 bg-white">
             <div className="flex-1 flex items-center">{slot}</div>

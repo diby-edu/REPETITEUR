@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
 import {
   LayoutDashboard, Calendar, BookOpen, LogOut, Users, ShieldCheck,
+  CreditCard, FileText, Wallet, Star,
 } from 'lucide-react'
 
 const NAV = {
@@ -19,9 +20,13 @@ const NAV = {
     { label: 'Séances',         href: '/reservations',           icon: Calendar },
   ],
   admin: [
-    { label: 'Tableau de bord', href: '/admin',                      icon: LayoutDashboard },
-    { label: 'Utilisateurs',    href: '/admin?tab=Utilisateurs',     icon: Users },
-    { label: 'Vérifications',   href: '/admin?tab=Vérifications',    icon: ShieldCheck },
+    { label: 'Vue globale',   href: '/admin',                       icon: LayoutDashboard },
+    { label: 'Vérifications', href: '/admin?tab=Vérifications',     icon: ShieldCheck },
+    { label: 'Utilisateurs',  href: '/admin?tab=Utilisateurs',      icon: Users },
+    { label: 'Abonnements',   href: '/admin?tab=Abonnements',       icon: CreditCard },
+    { label: 'Contrats',      href: '/admin?tab=Contrats',          icon: FileText },
+    { label: 'Paiements',     href: '/admin?tab=Paiements',         icon: Wallet },
+    { label: 'Avis',          href: '/admin?tab=Avis',              icon: Star },
   ],
 }
 

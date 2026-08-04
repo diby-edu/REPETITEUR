@@ -27,6 +27,62 @@ const WEEK_START  = _weekStart.toISOString().split('T')[0]
 const WEEK_END    = new Date(_weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 const MONTH_START = new Date(_now.getFullYear(), _now.getMonth(), 1).toISOString().split('T')[0]
 
+// ── Chart helpers ────────────────────────────────────────────
+function DonutChart({ segments, total, label = 'total' }) {
+  let cum = 0
+  const parts = total > 0
+    ? segments.map(s => {
+        const pct = (s.value / total) * 100
+        const part = `${s.color} ${cum.toFixed(1)}% ${(cum + pct).toFixed(1)}%`
+        cum += pct
+        return part
+      })
+    : []
+  return (
+    <div className="flex items-center gap-5 flex-wrap">
+      <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
+        <div
+          className="w-full h-full rounded-full"
+          style={{ background: total > 0 ? `conic-gradient(${parts.join(', ')}, #f3f4f6 ${cum.toFixed(1)}% 100%)` : '#f3f4f6' }}
+        />
+        <div className="absolute inset-[19px] rounded-full bg-white shadow-sm flex flex-col items-center justify-center">
+          <span className="text-[22px] font-black text-gray-900 leading-none">{total}</span>
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide mt-0.5">{label}</span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {segments.map(s => (
+          <div key={s.label} className="flex items-center gap-2 min-w-[120px]">
+            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+            <span className="text-sm text-gray-600 flex-1">{s.label}</span>
+            <span className="text-sm font-bold text-gray-900">{s.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function VerticalBars({ bars, height = 128 }) {
+  const max = Math.max(...bars.map(b => b.value), 1)
+  return (
+    <div className="flex items-end gap-3" style={{ height }}>
+      {bars.map((bar, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-700 tabular-nums">{bar.value}</span>
+          <div className="w-full flex items-end" style={{ height: height - 38 }}>
+            <div
+              className="w-full rounded-t-lg transition-all duration-700 ease-out"
+              style={{ backgroundColor: bar.color, height: `${(bar.value / max) * 100}%`, minHeight: bar.value > 0 ? 3 : 0 }}
+            />
+          </div>
+          <span className="text-[10px] text-gray-500 text-center leading-tight">{bar.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function AdminDashboardPage() {
   const { tutors, validateTutor, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
@@ -310,192 +366,202 @@ export default function AdminDashboardPage() {
       )}
 
       <div className="max-w-5xl mx-auto px-6 py-6">
-        {/* Page header + tab bar always at top */}
-        <div className="mb-1">
-          <h1 className="font-display text-xl font-bold text-gray-900">Administration 🛡️</h1>
+        <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
+
+        {/* Contextual page header — changes with active module */}
+        <div className="mb-6">
+          <h1 className="font-display text-xl font-bold text-gray-900">
+            {activeTab === 'Vue globale' ? 'Administration 🛡️' : activeTab}
+          </h1>
           <p className="text-gray-400 text-sm mt-0.5">
             MonRépétiteur · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
-        {/* Tabs — always visible immediately under the title */}
-        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
-          {TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => switchTab(tab)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
-                activeTab === tab ? 'text-primary border-primary' : 'text-gray-500 border-transparent hover:text-gray-700'
-              }`}
-            >
-              {tab}
-              {tab === 'Vérifications' && pending.length > 0 && (
-                <span className="ml-2 w-5 h-5 bg-primary text-white text-xs rounded-full inline-flex items-center justify-center">{pending.length}</span>
-              )}
-              {tab === 'Contrats' && sessionStats.toConfirm > 0 && (
-                <span className="ml-2 w-5 h-5 bg-orange-500 text-white text-xs rounded-full inline-flex items-center justify-center">{sessionStats.toConfirm}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
         {/* ── Tab: Vue globale ────────────────────────────────── */}
         {activeTab === 'Vue globale' && (
-          <>
-          {/* KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            {stats.map((stat, i) => (
-              <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
-                <div className={`absolute top-0 left-0 right-0 h-[3px] ${stat.bar}`} />
-                <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${stat.bg}`}>{stat.emoji}</div>
-                <div className="min-w-0">
-                  <p className={`font-black text-gray-900 tabular-nums leading-none ${stat.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{stat.value}</p>
-                  <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{stat.label}</p>
-                  {stat.delta && <p className={`text-[10px] font-bold mt-1 ${stat.deltaClass}`}>{stat.delta}</p>}
+          <div key="vue-globale" className="space-y-5" style={{ animation: 'fadeUp .3s ease-out' }}>
+
+            {/* KPI tiles */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: 'Répétiteurs actifs', value: verified.length, icon: GraduationCap, color: '#2D6A4F', bg: '#f0fdf4', delta: weekStats.tutors > 0 ? `↑ +${weekStats.tutors} cette semaine` : '→ stable', pos: weekStats.tutors > 0 },
+                { label: 'Parents inscrits',   value: parents.length,  icon: Users,         color: '#3b82f6', bg: '#eff6ff', delta: parentMonthCount > 0 ? `↑ +${parentMonthCount} ce mois` : '→ stable', pos: parentMonthCount > 0 },
+                { label: 'Contrats actifs',    value: engStats.active, icon: FileText,      color: '#E87722', bg: '#fff7ed', delta: engStats.pending > 0 ? `${engStats.pending} en attente` : '→ stable', pos: false },
+                { label: 'CA mensuel (FCFA)',  value: totalMonthlyRevenue > 0 ? formatFCFA(totalMonthlyRevenue) : '0', icon: Wallet, color: '#F4A61D', bg: '#fffbeb', delta: `${activeSubscriptions.length} abonnements actifs`, pos: activeSubscriptions.length > 0, big: totalMonthlyRevenue >= 100000 },
+              ].map((kpi, i) => (
+                <div key={i} className="card py-4 px-5 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[inherit]" style={{ backgroundColor: kpi.color }} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: kpi.bg }}>
+                    <kpi.icon size={18} style={{ color: kpi.color }} />
+                  </div>
+                  <p className={`font-black text-gray-900 tabular-nums leading-none ${kpi.big ? 'text-[17px]' : 'text-[26px]'}`}>{kpi.value}</p>
+                  <p className="text-[11px] text-gray-500 font-semibold mt-1.5 leading-tight">{kpi.label}</p>
+                  <p className={`text-[10px] font-bold mt-1.5 ${kpi.pos ? 'text-green-500' : 'text-gray-400'}`}>{kpi.delta}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Charts row: bar + donut */}
+            <div className="grid md:grid-cols-5 gap-5">
+              {/* Abonnements par plan — bar chart */}
+              <div className="card md:col-span-3">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Abonnements par plan</h3>
+                  <span className="text-xs text-gray-400 font-medium">{tutors.length} répétiteurs</span>
+                </div>
+                <VerticalBars bars={[
+                  { label: 'Gratuit',   value: tutors.filter(t => !t.subscription?.plan || t.subscription?.plan === 'gratuit').length, color: '#d1d5db' },
+                  { label: 'Standard',  value: standardSubs.length,   color: '#E87722' },
+                  { label: 'Premium',   value: premiumSubs.length,    color: '#F4A61D' },
+                  { label: 'Expiré',    value: tutors.filter(t => t.subscription?.status === 'expired').length, color: '#fca5a5' },
+                ]} height={140} />
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-xs text-gray-400">CA simulé ce mois</span>
+                  <span className="text-sm font-black text-secondary">{formatFCFA(totalMonthlyRevenue)}</span>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Actions requises + Cette semaine */}
-          <div className="grid md:grid-cols-2 gap-5 mb-6">
-            <div className="card border-orange-200 bg-orange-50/20">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-gray-900">⚠️ Actions requises</h2>
-                {(pending.length + sessionStats.toConfirm) > 0 && (
-                  <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">{pending.length + sessionStats.toConfirm} urgentes</span>
+              {/* Vérifications — donut */}
+              <div className="card md:col-span-2 flex flex-col">
+                <h3 className="font-semibold text-gray-900 mb-4">Vérification répétiteurs</h3>
+                <div className="flex-1 flex items-center">
+                  <DonutChart
+                    segments={[
+                      { label: 'Vérifiés',   value: verified.length, color: '#22c55e' },
+                      { label: 'En attente', value: pending.length,  color: '#f59e0b' },
+                      { label: 'Rejetés',    value: rejected.length, color: '#ef4444' },
+                    ]}
+                    total={tutors.length}
+                    label="répétiteurs"
+                  />
+                </div>
+                {pending.length > 0 && (
+                  <button onClick={() => switchTab('Vérifications')} className="mt-3 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-2 rounded-lg w-full transition-colors">
+                    Traiter {pending.length} dossier{pending.length > 1 ? 's' : ''} en attente
+                  </button>
                 )}
               </div>
-              {pending.length === 0 && sessionStats.toConfirm === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">Aucune action requise ✓</p>
-              ) : (
-                <div className="space-y-2">
-                  {pending.length > 0 && (
-                    <div className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-xl">
-                      <ShieldCheck size={16} className="text-orange-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{pending.length} vérification{pending.length > 1 ? 's' : ''} CNI en attente</p>
-                        <p className="text-xs text-gray-400 truncate">{pending.slice(0, 3).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
+            </div>
+
+            {/* Engagements + Actions requises */}
+            <div className="grid md:grid-cols-5 gap-5">
+              {/* Engagements — horizontal bars + sessions mini */}
+              <div className="card md:col-span-3">
+                <h3 className="font-semibold text-gray-900 mb-4">Activité des contrats</h3>
+                <div className="space-y-3 mb-4">
+                  {[
+                    { label: 'Actifs',      value: engStats.active,  total: totalEngagements, color: '#22c55e' },
+                    { label: 'En attente',  value: engStats.pending, total: totalEngagements, color: '#f59e0b' },
+                    { label: 'Terminés',    value: engStats.ended,   total: totalEngagements, color: '#d1d5db' },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600 w-24 flex-shrink-0">{item.label}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="h-2.5 rounded-full transition-all duration-700"
+                          style={{ width: `${item.total > 0 ? (item.value / item.total) * 100 : 0}%`, backgroundColor: item.color }}
+                        />
                       </div>
-                      <button onClick={() => switchTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
+                      <span className="text-sm font-bold text-gray-900 w-5 text-right tabular-nums">{item.value}</span>
                     </div>
-                  )}
-                  {sessionStats.toConfirm > 0 && (
-                    <div className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-xl">
-                      <Calendar size={16} className="text-blue-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
-                        <p className="text-xs text-gray-400">En attente de confirmation parent</p>
-                      </div>
-                      <button onClick={() => switchTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100 text-center">
+                  {[
+                    { label: 'Séances à venir',  value: sessionStats.upcoming,  color: 'text-blue-600' },
+                    { label: 'À confirmer',       value: sessionStats.toConfirm, color: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-900' },
+                    { label: 'Cette semaine',     value: weekStats.sessions,     color: 'text-green-600' },
+                  ].map(s => (
+                    <div key={s.label}>
+                      <p className={`text-2xl font-black ${s.color} tabular-nums`}>{s.value}</p>
+                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5 leading-tight">{s.label}</p>
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions requises */}
+              <div className="card md:col-span-2 border-orange-200 bg-orange-50/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-gray-900">⚠️ Actions requises</h3>
+                  {(pending.length + sessionStats.toConfirm) > 0 && (
+                    <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">{pending.length + sessionStats.toConfirm}</span>
                   )}
                 </div>
-              )}
-            </div>
-
-            <div className="card">
-              <h2 className="text-sm font-bold text-gray-900 mb-4">📊 Cette semaine</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Répétiteurs', value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
-                  { label: 'Parents',     value: `+${weekStats.parents}`,     bg: 'bg-secondary-50', color: 'text-secondary' },
-                  { label: 'Contrats',    value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
-                  { label: 'Séances',     value: `+${weekStats.sessions}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
-                ].map(item => (
-                  <div key={item.label} className={`${item.bg} rounded-xl p-4 text-center`}>
-                    <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
-                    <p className="text-xs text-gray-500 mt-1 font-medium">{item.label}</p>
+                {pending.length === 0 && sessionStats.toConfirm === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-2xl mb-1">✓</p>
+                    <p className="text-sm text-gray-400">Tout est traité</p>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-2">
+                    {pending.length > 0 && (
+                      <div className="flex items-center gap-2.5 p-2.5 bg-white border border-orange-200 rounded-xl">
+                        <ShieldCheck size={15} className="text-orange-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-900">{pending.length} CNI en attente</p>
+                          <p className="text-[10px] text-gray-400 truncate">{pending.slice(0, 2).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
+                        </div>
+                        <button onClick={() => switchTab('Vérifications')} className="text-[10px] font-bold text-white bg-orange-500 hover:bg-orange-600 px-2 py-1 rounded-lg whitespace-nowrap">Traiter</button>
+                      </div>
+                    )}
+                    {sessionStats.toConfirm > 0 && (
+                      <div className="flex items-center gap-2.5 p-2.5 bg-white border border-blue-200 rounded-xl">
+                        <Calendar size={15} className="text-blue-500 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
+                          <p className="text-[10px] text-gray-400">Confirmation parent requise</p>
+                        </div>
+                        <button onClick={() => switchTab('Contrats')} className="text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg whitespace-nowrap">Voir</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
 
-          {/* Revenue */}
-          <div className="card mb-6 bg-gradient-to-br from-secondary-50 to-primary-50 border-secondary-100">
-            <div className="flex items-center gap-3 mb-4">
-              <BarChart3 size={18} className="text-secondary" />
-              <h2 className="font-semibold text-gray-900">Revenus mensuels simulés</h2>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-xl font-bold text-primary">{formatFCFA(standardSubs.length * 3000)}</p>
-                <p className="text-xs text-gray-500">Plan Standard ({standardSubs.length})</p>
+            {/* Revenue + Cette semaine */}
+            <div className="grid md:grid-cols-2 gap-5">
+              <div className="card bg-gradient-to-br from-secondary-50 to-primary-50 border-secondary-100">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 size={16} className="text-secondary" />
+                  <h3 className="font-semibold text-gray-900 text-sm">Revenus mensuels simulés</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-white/60 rounded-xl p-3">
+                    <p className="text-lg font-black text-primary tabular-nums">{formatFCFA(standardSubs.length * 3000)}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Standard ({standardSubs.length})</p>
+                  </div>
+                  <div className="bg-white/60 rounded-xl p-3">
+                    <p className="text-lg font-black text-accent tabular-nums">{formatFCFA(premiumSubs.length * 5000)}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Premium ({premiumSubs.length})</p>
+                  </div>
+                  <div className="bg-white/60 rounded-xl p-3">
+                    <p className="text-lg font-black text-secondary tabular-nums">{formatFCFA(totalMonthlyRevenue)}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">Total</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xl font-bold text-accent">{formatFCFA(premiumSubs.length * 5000)}</p>
-                <p className="text-xs text-gray-500">Plan Premium ({premiumSubs.length})</p>
-              </div>
-              <div>
-                <p className="text-xl font-bold text-secondary">{formatFCFA((standardSubs.length * 3000) + (premiumSubs.length * 5000))}</p>
-                <p className="text-xs text-gray-500">Total mensuel</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Vue globale summary grids */}
-          <div className="grid md:grid-cols-2 gap-5">
-            <div className="card">
-              <h3 className="font-semibold text-gray-900 mb-4">Statuts de vérification</h3>
-              <div className="space-y-3">
-                {[
-                  { label: 'Vérifiés',   value: verified.length,       color: 'bg-green-500' },
-                  { label: 'En attente', value: pending.length,        color: 'bg-yellow-400' },
-                  { label: 'Rejetés',    value: rejected.length,       color: 'bg-red-400' },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-24">{item.label}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-3">
-                      <div className={`${item.color} h-3 rounded-full`} style={{ width: `${tutors.length ? (item.value / tutors.length) * 100 : 0}%` }} />
+              <div className="card">
+                <h3 className="text-sm font-bold text-gray-900 mb-3">📊 Cette semaine</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Nouveaux répét.',   value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
+                    { label: 'Nouveaux parents',  value: `+${weekStats.parents}`,     bg: 'bg-blue-50',      color: 'text-blue-600' },
+                    { label: 'Nouveaux contrats', value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
+                    { label: 'Séances planif.',   value: `+${weekStats.sessions}`,    bg: 'bg-purple-50',    color: 'text-purple-600' },
+                  ].map(item => (
+                    <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center`}>
+                      <p className={`text-xl font-black ${item.color} tabular-nums`}>{item.value}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5 font-medium leading-tight">{item.label}</p>
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 w-6 text-right">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="font-semibold text-gray-900 mb-4">Statuts des abonnements</h3>
-              <div className="space-y-3">
-                {[
-                  { label: 'Premium',  value: premiumSubs.length,                                                    color: 'bg-accent' },
-                  { label: 'Standard', value: standardSubs.length,                                                   color: 'bg-primary' },
-                  { label: 'Expiré',   value: tutors.filter(t => t.subscription?.status === 'expired').length,       color: 'bg-red-400' },
-                  { label: 'Gratuit',  value: tutors.filter(t => !t.subscription?.plan || t.subscription?.plan === 'gratuit').length, color: 'bg-gray-300' },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-24">{item.label}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-3">
-                      <div className={`${item.color} h-3 rounded-full`} style={{ width: `${tutors.length ? (item.value / tutors.length) * 100 : 0}%` }} />
-                    </div>
-                    <span className="text-sm font-semibold text-gray-700 w-6 text-right">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Activité des contrats */}
-            <div className="card md:col-span-2">
-              <h3 className="font-semibold text-gray-900 mb-4">Activité des contrats</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center">
-                {[
-                  { label: 'Contrats total',  value: totalEngagements,          color: 'text-gray-900' },
-                  { label: 'Actifs',          value: engStats.active,           color: 'text-green-600' },
-                  { label: 'En attente',      value: engStats.pending,          color: 'text-yellow-600' },
-                  { label: 'Terminés',        value: engStats.ended,            color: 'text-gray-500' },
-                  { label: 'Séances totales', value: totalSessions,             color: 'text-gray-900' },
-                  { label: 'À confirmer',     value: sessionStats.toConfirm,    color: sessionStats.toConfirm > 0 ? 'text-orange-600' : 'text-gray-500' },
-                ].map(item => (
-                  <div key={item.label} className="bg-gray-50 rounded-xl p-4">
-                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{item.label}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-          </>
         )}
 
         {/* ── Tab: Vérifications ──────────────────────────────── */}

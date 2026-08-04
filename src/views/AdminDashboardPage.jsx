@@ -309,109 +309,16 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="mb-6">
+      <div className="max-w-5xl mx-auto px-6 py-6">
+        {/* Page header + tab bar always at top */}
+        <div className="mb-1">
           <h1 className="font-display text-xl font-bold text-gray-900">Administration 🛡️</h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            MonRépétiteur · Tableau de bord · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            MonRépétiteur · {new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
         </div>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {stats.map((stat, i) => (
-            <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
-              <div className={`absolute top-0 left-0 right-0 h-[3px] ${stat.bar}`} />
-              <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${stat.bg}`}>{stat.emoji}</div>
-              <div className="min-w-0">
-                <p className={`font-black text-gray-900 tabular-nums leading-none ${stat.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{stat.value}</p>
-                <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{stat.label}</p>
-                {stat.delta && <p className={`text-[10px] font-bold mt-1 ${stat.deltaClass}`}>{stat.delta}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Actions requises + Cette semaine */}
-        <div className="grid md:grid-cols-2 gap-5 mb-6">
-          {/* Actions requises */}
-          <div className="card border-orange-200 bg-orange-50/20">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-900">⚠️ Actions requises</h2>
-              {(pending.length + sessionStats.toConfirm) > 0 && (
-                <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">{pending.length + sessionStats.toConfirm} urgentes</span>
-              )}
-            </div>
-            {pending.length === 0 && sessionStats.toConfirm === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">Aucune action requise ✓</p>
-            ) : (
-              <div className="space-y-2">
-                {pending.length > 0 && (
-                  <div className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-xl">
-                    <ShieldCheck size={16} className="text-orange-500 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{pending.length} vérification{pending.length > 1 ? 's' : ''} CNI en attente</p>
-                      <p className="text-xs text-gray-400 truncate">{pending.slice(0, 3).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
-                    </div>
-                    <button onClick={() => switchTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
-                  </div>
-                )}
-                {sessionStats.toConfirm > 0 && (
-                  <div className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-xl">
-                    <Calendar size={16} className="text-blue-500 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
-                      <p className="text-xs text-gray-400">En attente de confirmation parent</p>
-                    </div>
-                    <button onClick={() => switchTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Cette semaine */}
-          <div className="card">
-            <h2 className="text-sm font-bold text-gray-900 mb-4">📊 Cette semaine</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Répétiteurs', value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
-                { label: 'Parents',     value: `+${weekStats.parents}`,     bg: 'bg-secondary-50', color: 'text-secondary' },
-                { label: 'Contrats',    value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
-                { label: 'Séances',     value: `+${weekStats.sessions}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
-              ].map(item => (
-                <div key={item.label} className={`${item.bg} rounded-xl p-4 text-center`}>
-                  <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
-                  <p className="text-xs text-gray-500 mt-1 font-medium">{item.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Revenue */}
-        <div className="card mb-6 bg-gradient-to-br from-secondary-50 to-primary-50 border-secondary-100">
-          <div className="flex items-center gap-3 mb-4">
-            <BarChart3 size={18} className="text-secondary" />
-            <h2 className="font-semibold text-gray-900">Revenus mensuels simulés</h2>
-          </div>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xl font-bold text-primary">{formatFCFA(standardSubs.length * 3000)}</p>
-              <p className="text-xs text-gray-500">Plan Standard ({standardSubs.length})</p>
-            </div>
-            <div>
-              <p className="text-xl font-bold text-accent">{formatFCFA(premiumSubs.length * 5000)}</p>
-              <p className="text-xs text-gray-500">Plan Premium ({premiumSubs.length})</p>
-            </div>
-            <div>
-              <p className="text-xl font-bold text-secondary">{formatFCFA((standardSubs.length * 3000) + (premiumSubs.length * 5000))}</p>
-              <p className="text-xs text-gray-500">Total mensuel</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
+        {/* Tabs — always visible immediately under the title */}
         <div className="flex border-b border-gray-200 mb-6 overflow-x-auto scrollbar-hide">
           {TABS.map(tab => (
             <button
@@ -434,6 +341,100 @@ export default function AdminDashboardPage() {
 
         {/* ── Tab: Vue globale ────────────────────────────────── */}
         {activeTab === 'Vue globale' && (
+          <>
+          {/* KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {stats.map((stat, i) => (
+              <div key={i} className="card relative overflow-hidden flex items-center gap-4 py-4 px-4">
+                <div className={`absolute top-0 left-0 right-0 h-[3px] ${stat.bar}`} />
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${stat.bg}`}>{stat.emoji}</div>
+                <div className="min-w-0">
+                  <p className={`font-black text-gray-900 tabular-nums leading-none ${stat.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{stat.value}</p>
+                  <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{stat.label}</p>
+                  {stat.delta && <p className={`text-[10px] font-bold mt-1 ${stat.deltaClass}`}>{stat.delta}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions requises + Cette semaine */}
+          <div className="grid md:grid-cols-2 gap-5 mb-6">
+            <div className="card border-orange-200 bg-orange-50/20">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-gray-900">⚠️ Actions requises</h2>
+                {(pending.length + sessionStats.toConfirm) > 0 && (
+                  <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded-full">{pending.length + sessionStats.toConfirm} urgentes</span>
+                )}
+              </div>
+              {pending.length === 0 && sessionStats.toConfirm === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">Aucune action requise ✓</p>
+              ) : (
+                <div className="space-y-2">
+                  {pending.length > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-white border border-orange-200 rounded-xl">
+                      <ShieldCheck size={16} className="text-orange-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{pending.length} vérification{pending.length > 1 ? 's' : ''} CNI en attente</p>
+                        <p className="text-xs text-gray-400 truncate">{pending.slice(0, 3).map(t => `${t.firstName} ${t.lastName?.[0]}.`).join(', ')}</p>
+                      </div>
+                      <button onClick={() => switchTab('Vérifications')} className="text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg whitespace-nowrap">Traiter</button>
+                    </div>
+                  )}
+                  {sessionStats.toConfirm > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-white border border-blue-200 rounded-xl">
+                      <Calendar size={16} className="text-blue-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{sessionStats.toConfirm} séance{sessionStats.toConfirm > 1 ? 's' : ''} sans rapport</p>
+                        <p className="text-xs text-gray-400">En attente de confirmation parent</p>
+                      </div>
+                      <button onClick={() => switchTab('Contrats')} className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="card">
+              <h2 className="text-sm font-bold text-gray-900 mb-4">📊 Cette semaine</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Répétiteurs', value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
+                  { label: 'Parents',     value: `+${weekStats.parents}`,     bg: 'bg-secondary-50', color: 'text-secondary' },
+                  { label: 'Contrats',    value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
+                  { label: 'Séances',     value: `+${weekStats.sessions}`,    bg: 'bg-blue-50',      color: 'text-blue-600' },
+                ].map(item => (
+                  <div key={item.label} className={`${item.bg} rounded-xl p-4 text-center`}>
+                    <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
+                    <p className="text-xs text-gray-500 mt-1 font-medium">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue */}
+          <div className="card mb-6 bg-gradient-to-br from-secondary-50 to-primary-50 border-secondary-100">
+            <div className="flex items-center gap-3 mb-4">
+              <BarChart3 size={18} className="text-secondary" />
+              <h2 className="font-semibold text-gray-900">Revenus mensuels simulés</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xl font-bold text-primary">{formatFCFA(standardSubs.length * 3000)}</p>
+                <p className="text-xs text-gray-500">Plan Standard ({standardSubs.length})</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-accent">{formatFCFA(premiumSubs.length * 5000)}</p>
+                <p className="text-xs text-gray-500">Plan Premium ({premiumSubs.length})</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-secondary">{formatFCFA((standardSubs.length * 3000) + (premiumSubs.length * 5000))}</p>
+                <p className="text-xs text-gray-500">Total mensuel</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Vue globale summary grids */}
           <div className="grid md:grid-cols-2 gap-5">
             <div className="card">
               <h3 className="font-semibold text-gray-900 mb-4">Statuts de vérification</h3>
@@ -494,6 +495,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </div>
+          </>
         )}
 
         {/* ── Tab: Vérifications ──────────────────────────────── */}

@@ -27,7 +27,8 @@ const AVATAR_COLORS = ['#E87722', '#2D6A4F', '#9B59B6', '#2980B9', '#E74C3C', '#
 
 // ── Composants locaux ────────────────────────────────────────────
 
-function FileUploadZone({ file, onFile, inputRef, label }) {
+function FileUploadZone({ file, existingPath, uploading, onFile, inputRef, label }) {
+  const done = !!file || !!existingPath
   return (
     <>
       <input
@@ -40,15 +41,27 @@ function FileUploadZone({ file, onFile, inputRef, label }) {
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className={`w-full border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer ${
-          file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+        disabled={uploading}
+        className={`w-full border-2 border-dashed rounded-xl p-4 flex flex-col items-center gap-2 transition-all cursor-pointer disabled:cursor-wait ${
+          done ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
         }`}
       >
-        {file ? (
+        {uploading ? (
+          <>
+            <RefreshCw size={22} className="text-primary animate-spin" />
+            <span className="text-xs font-medium text-gray-500">Envoi en cours…</span>
+          </>
+        ) : file ? (
           <>
             <FileText size={22} className="text-green-500" />
             <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
             <span className="text-xs text-gray-400">Cliquer pour changer</span>
+          </>
+        ) : existingPath ? (
+          <>
+            <CheckCircle size={22} className="text-green-500" />
+            <span className="text-xs font-medium text-green-700 text-center">Document déjà envoyé</span>
+            <span className="text-xs text-gray-400">Cliquer pour remplacer</span>
           </>
         ) : (
           <>
@@ -60,6 +73,13 @@ function FileUploadZone({ file, onFile, inputRef, label }) {
       </button>
     </>
   )
+}
+
+async function uploadDoc(userId, file, filename) {
+  const ext = file.name.split('.').pop()
+  const path = `${userId}/${filename}.${ext}`
+  const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
+  return error ? null : path
 }
 
 function OtpInput({ value, onChange }) {
@@ -121,6 +141,9 @@ export default function RegisterTutorPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [stepSaving, setStepSaving] = useState(false)
+  const [uploadingDocs, setUploadingDocs] = useState({})
+  const [selfieUploading, setSelfieUploading] = useState(false)
 
   // Étape 0
   const [showPwd, setShowPwd] = useState(false)
@@ -150,7 +173,8 @@ export default function RegisterTutorPage() {
     availability: { lundi: [], mardi: [], mercredi: [], jeudi: [], vendredi: [], samedi: [], dimanche: [] },
     idType: 'cni',
     cniRectoFile: null, cniVersoFile: null, passportFile: null,
-    diplomas: [{ name: '', file: null }],
+    documents: {},
+    diplomas: [{ name: '', file: null, path: null, uploading: false }],
     selfieDataUrl: null,
     avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
   })
@@ -198,10 +222,58 @@ export default function RegisterTutorPage() {
   // Validation diplômes
   const diplomasValid = form.diplomas.every(d => {
     const hasName = d.name.trim() !== ''
-    const hasFile = !!d.file
-    return (!hasName && !hasFile) || (hasName && hasFile)
+    const hasContent = !!d.file || !!d.path
+    return (!hasName && !hasContent) || (hasName && hasContent)
   })
-  const diplomasReady = form.diplomas.some(d => d.name.trim() && d.file) && diplomasValid
+  const diplomasReady = form.diplomas.some(d => d.name.trim() && (d.file || d.path)) && diplomasValid
+
+  // ── Sauvegarde progressive (survit à un refresh) ──────────────
+  const persistDocPatch = async (patch) => {
+    let newDocs
+    setForm(f => {
+      newDocs = { ...f.documents, ...patch }
+      return { ...f, documents: newDocs }
+    })
+    if (currentUser?.id) await supabase.from('tutors').update({ documents: newDocs }).eq('id', currentUser.id)
+  }
+
+  const persistDiplomas = async () => {
+    let newDocs
+    setForm(f => {
+      const diplomes = f.diplomas.filter(d => d.name.trim() && d.path).map(d => ({ name: d.name.trim(), path: d.path }))
+      newDocs = { ...f.documents, diplomes }
+      return { ...f, documents: newDocs }
+    })
+    if (currentUser?.id) await supabase.from('tutors').update({ documents: newDocs }).eq('id', currentUser.id)
+  }
+
+  const handleIdFile = async (field, file) => {
+    set(`${field}File`, file)
+    if (!file || !currentUser?.id) return
+    setUploadingDocs(u => ({ ...u, [field]: true }))
+    const filename = field === 'cniRecto' ? 'cni_recto' : field === 'cniVerso' ? 'cni_verso' : 'passport'
+    const path = await uploadDoc(currentUser.id, file, filename)
+    setUploadingDocs(u => ({ ...u, [field]: false }))
+    if (!path) { setError("Échec de l'envoi du fichier. Réessayez."); return }
+    await persistDocPatch({ idType: form.idType, [field]: true, [`${field}Path`]: path })
+  }
+
+  const handleDiplomaFile = async (i, file) => {
+    setForm(f => {
+      const next = [...f.diplomas]
+      next[i] = { ...next[i], file, uploading: !!file }
+      return { ...f, diplomas: next }
+    })
+    if (!file || !currentUser?.id) return
+    const path = await uploadDoc(currentUser.id, file, `diplome_${i}_${Date.now()}`)
+    setForm(f => {
+      const next = [...f.diplomas]
+      next[i] = { ...next[i], path: path || next[i].path, uploading: false }
+      return { ...f, diplomas: next }
+    })
+    if (path) await persistDiplomas()
+    else setError("Échec de l'envoi du fichier. Réessayez.")
+  }
 
   // Caméra
   const startCamera = async () => {
@@ -215,15 +287,26 @@ export default function RegisterTutorPage() {
     }
   }
 
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     const canvas = canvasRef.current
     const video = videoRef.current
     if (!canvas || !video) return
     canvas.width = video.videoWidth || 640
     canvas.height = video.videoHeight || 480
     canvas.getContext('2d').drawImage(video, 0, 0)
-    set('selfieDataUrl', canvas.toDataURL('image/jpeg', 0.85))
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    set('selfieDataUrl', dataUrl)
     stopCamera()
+    if (!currentUser?.id) return
+    setSelfieUploading(true)
+    try {
+      const blob = await (await fetch(dataUrl)).blob()
+      const { error: e } = await supabase.storage.from('documents').upload(`${currentUser.id}/selfie.jpg`, blob, { upsert: true, contentType: 'image/jpeg' })
+      if (!e) await persistDocPatch({ selfiePath: `${currentUser.id}/selfie.jpg` })
+      else setError("Échec de l'envoi du selfie. Réessayez.")
+    } finally {
+      setSelfieUploading(false)
+    }
   }
 
   const stopCamera = useCallback(() => {
@@ -249,6 +332,51 @@ export default function RegisterTutorPage() {
       return () => clearTimeout(t)
     }
   }, [resendTimer])
+
+  // Reprise après refresh : si déjà authentifié, sauter compte/OTP et reprendre
+  // exactement là où l'utilisateur s'est arrêté (aucune donnée n'est perdue,
+  // chaque étape est sauvegardée en base au fur et à mesure).
+  useEffect(() => {
+    if (!currentUser?.id || currentUser.role !== 'tutor') return
+    if (currentUser.verificationStatus === 'verified' || currentUser.verificationStatus === 'rejected') {
+      router.replace('/tableau-de-bord/repetiteur')
+      return
+    }
+
+    const docs = currentUser.documents || {}
+    const quartierOk = QUARTIERS_BY_CITY[currentUser.city]?.length > 0 ? !!currentUser.quartier : true
+    const hasBasicInfo = !!(currentUser.firstName && currentUser.lastName && currentUser.phone && currentUser.city && currentUser.bio?.trim() && quartierOk)
+    const primaireOnly = currentUser.levels?.length === 1 && currentUser.levels[0] === 'Primaire'
+    const hasExpertise = currentUser.levels?.length > 0 && (primaireOnly || currentUser.subjects?.length > 0) && currentUser.monthlyRate > 0 && currentUser.modalities?.length > 0
+    const hasId = docs.idType === 'cni' ? !!(docs.cniRecto && docs.cniVerso) : docs.idType === 'passport' ? !!docs.passport : false
+    const hasDocuments = hasId && docs.diplomes?.length > 0
+    const hasSelfie = !!docs.selfiePath
+
+    setForm(f => ({
+      ...f,
+      firstName: currentUser.firstName || f.firstName,
+      lastName: currentUser.lastName || f.lastName,
+      phone: currentUser.phone || f.phone,
+      city: currentUser.city || f.city,
+      quartier: currentUser.quartier || f.quartier,
+      bio: currentUser.bio || f.bio,
+      subjects: currentUser.subjects?.length ? currentUser.subjects : f.subjects,
+      levels: currentUser.levels?.length ? currentUser.levels : f.levels,
+      monthlyRate: currentUser.monthlyRate ? String(currentUser.monthlyRate) : f.monthlyRate,
+      modalities: currentUser.modalities?.length ? currentUser.modalities : f.modalities,
+      availability: currentUser.availability && Object.keys(currentUser.availability).length ? { ...f.availability, ...currentUser.availability } : f.availability,
+      idType: docs.idType || f.idType,
+      documents: docs,
+      diplomas: docs.diplomes?.length ? docs.diplomes.map(d => ({ name: d.name, path: d.path, file: null, uploading: false })) : f.diplomas,
+      avatarColor: currentUser.avatarColor || f.avatarColor,
+    }))
+
+    if (!hasBasicInfo) setStep(2)
+    else if (!hasExpertise) setStep(3)
+    else if (!hasDocuments) setStep(4)
+    else if (!hasSelfie) setStep(5)
+    else setSubmitted(true)
+  }, [currentUser?.id])
 
   // ── Étape 0 : Créer le compte ─────────────────────────────────
 
@@ -306,74 +434,14 @@ export default function RegisterTutorPage() {
   }
 
   // ── Soumission finale (étape 5 → selfie) ─────────────────────
+  // Chaque étape a déjà sauvegardé ses données au fur et à mesure (voir
+  // handleNext, persistDocPatch, persistDiplomas) — il ne reste qu'à
+  // rafraîchir le profil local et afficher l'écran de confirmation.
 
   const handleSubmit = async () => {
-    if (!currentUser?.id) return
+    if (!currentUser?.id || !form.documents?.selfiePath) return
     setLoading(true)
     setError('')
-    const userId = currentUser.id
-
-    // Mettre à jour le profil
-    await supabase.from('profiles').update({
-      first_name: form.firstName,
-      last_name: form.lastName,
-      phone: form.phone || null,
-      city: form.city,
-      quartier: form.quartier || null,
-      avatar_color: form.avatarColor,
-    }).eq('id', userId)
-
-    // Mettre à jour les données répétiteur
-    await supabase.from('tutors').update({
-      bio: form.bio,
-      subjects: form.subjects,
-      levels: form.levels,
-      monthly_rate: parseInt(form.monthlyRate) || 25000,
-      modalities: form.modalities,
-      availability: form.availability,
-    }).eq('id', userId)
-
-    // Uploader les documents
-    const documents = { idType: form.idType }
-
-    if (form.idType === 'cni') {
-      if (form.cniRectoFile) {
-        const ext = form.cniRectoFile.name.split('.').pop()
-        const { error: e } = await supabase.storage.from('documents').upload(`${userId}/cni_recto.${ext}`, form.cniRectoFile, { upsert: true })
-        if (!e) { documents.cniRecto = true; documents.cniRectoPath = `${userId}/cni_recto.${ext}` }
-      }
-      if (form.cniVersoFile) {
-        const ext = form.cniVersoFile.name.split('.').pop()
-        const { error: e } = await supabase.storage.from('documents').upload(`${userId}/cni_verso.${ext}`, form.cniVersoFile, { upsert: true })
-        if (!e) { documents.cniVerso = true; documents.cniVersoPath = `${userId}/cni_verso.${ext}` }
-      }
-    } else if (form.passportFile) {
-      const ext = form.passportFile.name.split('.').pop()
-      const { error: e } = await supabase.storage.from('documents').upload(`${userId}/passport.${ext}`, form.passportFile, { upsert: true })
-      if (!e) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}` }
-    }
-
-    const uploadedDiplomas = []
-    for (let i = 0; i < form.diplomas.length; i++) {
-      const d = form.diplomas[i]
-      if (!d.file || !d.name.trim()) continue
-      const ext = d.file.name.split('.').pop()
-      const path = `${userId}/diplome_${i}.${ext}`
-      const { error: e } = await supabase.storage.from('documents').upload(path, d.file, { upsert: true })
-      if (!e) uploadedDiplomas.push({ name: d.name.trim(), path })
-    }
-    documents.diplomes = uploadedDiplomas
-
-    if (form.selfieDataUrl) {
-      try {
-        const res = await fetch(form.selfieDataUrl)
-        const blob = await res.blob()
-        const { error: e } = await supabase.storage.from('documents').upload(`${userId}/selfie.jpg`, blob, { upsert: true, contentType: 'image/jpeg' })
-        if (!e) documents.selfiePath = `${userId}/selfie.jpg`
-      } catch { /* non bloquant */ }
-    }
-
-    await supabase.from('tutors').update({ documents }).eq('id', userId)
     await refreshCurrentUser()
     setLoading(false)
     setSubmitted(true)
@@ -400,7 +468,7 @@ export default function RegisterTutorPage() {
               <li>Choisissez un abonnement pour être prêt</li>
             </ul>
           </div>
-          <button onClick={() => router.push('/tableau-de-bord/repetiteur')} className="btn-primary">
+          <button onClick={() => router.push('/tableau-de-bord/repetiteur?welcome=1')} className="btn-primary">
             Accéder à mon tableau de bord
           </button>
         </div>
@@ -426,11 +494,42 @@ export default function RegisterTutorPage() {
     }
     if (step === 3) return (isPrimaireOnly || form.subjects.length > 0) && form.levels.length > 0 && form.monthlyRate && form.modalities.length > 0
     if (step === 4) {
-      const hasId = form.idType === 'cni' ? !!(form.cniRectoFile && form.cniVersoFile) : !!form.passportFile
+      const hasId = form.idType === 'cni'
+        ? !!(form.documents?.cniRecto && form.documents?.cniVerso)
+        : !!form.documents?.passport
       return hasId && diplomasReady
     }
     return true
   })()
+
+  // ── Sauvegarde à chaque étape (survit à un refresh) ───────────
+  const handleNext = async () => {
+    setError('')
+    if (!currentUser?.id) { setStep(s => s + 1); return }
+    setStepSaving(true)
+    let err = null
+    if (step === 2) {
+      const r1 = await supabase.from('profiles').update({
+        first_name: form.firstName, last_name: form.lastName, phone: form.phone || null,
+        city: form.city, quartier: form.quartier || null, avatar_color: form.avatarColor,
+      }).eq('id', currentUser.id)
+      const r2 = await supabase.from('tutors').update({ bio: form.bio }).eq('id', currentUser.id)
+      err = r1.error || r2.error
+    } else if (step === 3) {
+      const r = await supabase.from('tutors').update({
+        subjects: form.subjects, levels: form.levels,
+        monthly_rate: parseInt(form.monthlyRate) || 0,
+        modalities: form.modalities, availability: form.availability,
+      }).eq('id', currentUser.id)
+      err = r.error
+    } else if (step === 4) {
+      const r = await supabase.from('tutors').update({ documents: { ...form.documents, idType: form.idType } }).eq('id', currentUser.id)
+      err = r.error
+    }
+    setStepSaving(false)
+    if (err) { setError('Erreur lors de la sauvegarde. Réessayez.'); return }
+    setStep(s => s + 1)
+  }
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-surface px-4 py-10">
@@ -757,17 +856,38 @@ export default function RegisterTutorPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-gray-500 mb-1.5">CNI Recto *</p>
-                      <FileUploadZone file={form.cniRectoFile} onFile={f => set('cniRectoFile', f)} inputRef={cniRectoRef} label="Charger le recto" />
+                      <FileUploadZone
+                        file={form.cniRectoFile}
+                        existingPath={form.documents?.cniRectoPath}
+                        uploading={uploadingDocs.cniRecto}
+                        onFile={f => handleIdFile('cniRecto', f)}
+                        inputRef={cniRectoRef}
+                        label="Charger le recto"
+                      />
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1.5">CNI Verso *</p>
-                      <FileUploadZone file={form.cniVersoFile} onFile={f => set('cniVersoFile', f)} inputRef={cniVersoRef} label="Charger le verso" />
+                      <FileUploadZone
+                        file={form.cniVersoFile}
+                        existingPath={form.documents?.cniVersoPath}
+                        uploading={uploadingDocs.cniVerso}
+                        onFile={f => handleIdFile('cniVerso', f)}
+                        inputRef={cniVersoRef}
+                        label="Charger le verso"
+                      />
                     </div>
                   </div>
                 ) : (
                   <div>
                     <p className="text-xs text-gray-500 mb-1.5">Page photo du passeport *</p>
-                    <FileUploadZone file={form.passportFile} onFile={f => set('passportFile', f)} inputRef={passportRef} label="Charger la page photo" />
+                    <FileUploadZone
+                      file={form.passportFile}
+                      existingPath={form.documents?.passportPath}
+                      uploading={uploadingDocs.passport}
+                      onFile={f => handleIdFile('passport', f)}
+                      inputRef={passportRef}
+                      label="Charger la page photo"
+                    />
                   </div>
                 )}
               </div>
@@ -776,22 +896,25 @@ export default function RegisterTutorPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-700">Diplômes *</p>
-                  <button type="button" onClick={() => set('diplomas', [...form.diplomas, { name: '', file: null }])}
+                  <button type="button" onClick={() => set('diplomas', [...form.diplomas, { name: '', file: null, path: null, uploading: false }])}
                     className="text-xs font-semibold text-primary bg-primary-50 hover:bg-primary-100 flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors">
                     <Plus size={13} /> Ajouter un diplôme
                   </button>
                 </div>
                 <div className="space-y-3">
                   {form.diplomas.map((d, i) => {
-                    const partialError = (d.name.trim() && !d.file) || (!d.name.trim() && !!d.file)
-                    const removeDiploma = () => {
+                    const hasContent = !!d.file || !!d.path
+                    const partialError = (d.name.trim() && !hasContent) || (!d.name.trim() && hasContent)
+                    const removeDiploma = async () => {
                       const next = form.diplomas.filter((_, idx) => idx !== i)
-                      set('diplomas', next.length > 0 ? next : [{ name: '', file: null }])
+                      set('diplomas', next.length > 0 ? next : [{ name: '', file: null, path: null, uploading: false }])
+                      await persistDiplomas()
                     }
-                    const clearFile = () => {
+                    const clearFile = async () => {
                       const next = [...form.diplomas]
-                      next[i] = { ...next[i], file: null }
+                      next[i] = { ...next[i], file: null, path: null }
                       set('diplomas', next)
+                      await persistDiplomas()
                     }
                     return (
                       <div key={i} className={`space-y-2 p-3 rounded-xl border ${partialError ? 'border-orange-300 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
@@ -806,7 +929,7 @@ export default function RegisterTutorPage() {
                               set('diplomas', next)
                             }}
                           />
-                          {(d.name || d.file || form.diplomas.length > 1) && (
+                          {(d.name || hasContent || form.diplomas.length > 1) && (
                             <button type="button" onClick={removeDiploma} aria-label="Supprimer ce diplôme"
                               className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                               <X size={15} />
@@ -820,17 +943,17 @@ export default function RegisterTutorPage() {
                               accept="image/jpeg,image/png,image/webp,application/pdf"
                               className="hidden"
                               id={`diploma-file-${i}`}
-                              onChange={e => {
-                                const next = [...form.diplomas]
-                                next[i] = { ...next[i], file: e.target.files?.[0] || null }
-                                set('diplomas', next)
-                              }}
+                              onChange={e => handleDiplomaFile(i, e.target.files?.[0] || null)}
                             />
-                            {d.file ? (
+                            {d.uploading ? (
+                              <div className="w-full border-2 border-dashed border-primary/40 bg-primary-50/40 rounded-xl p-2.5 flex items-center gap-2 text-xs text-gray-500">
+                                <RefreshCw size={14} className="text-primary animate-spin flex-shrink-0" /> Envoi en cours…
+                              </div>
+                            ) : hasContent ? (
                               <div className="w-full border-2 border-dashed border-green-400 bg-green-50 rounded-xl p-2.5 flex items-center gap-2 text-xs text-green-700">
                                 <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
                                 <button type="button" onClick={() => document.getElementById(`diploma-file-${i}`)?.click()} className="flex-1 text-left truncate hover:underline">
-                                  {d.file.name}
+                                  {d.file ? d.file.name : 'Fichier déjà envoyé'}
                                 </button>
                                 <button type="button" onClick={clearFile} aria-label="Supprimer le fichier"
                                   className="flex-shrink-0 text-green-600 hover:text-red-500 transition-colors">
@@ -852,7 +975,7 @@ export default function RegisterTutorPage() {
                     )
                   })}
                 </div>
-                {!diplomasReady && form.diplomas.every(d => !d.name && !d.file) && (
+                {!diplomasReady && form.diplomas.every(d => !d.name && !d.file && !d.path) && (
                   <p className="text-xs text-gray-400 mt-1">Ajoutez au moins un diplôme avec son fichier.</p>
                 )}
               </div>
@@ -870,11 +993,22 @@ export default function RegisterTutorPage() {
               <div className="bg-gray-50 rounded-2xl p-4">
                 {form.selfieDataUrl ? (
                   <div className="flex flex-col items-center gap-3">
-                    <img src={form.selfieDataUrl} alt="selfie" className="w-56 h-44 object-cover rounded-xl border-2 border-green-300" />
-                    <button type="button" onClick={() => { set('selfieDataUrl', null); startCamera() }}
-                      className="flex items-center gap-1.5 text-sm text-primary hover:underline">
-                      <RefreshCw size={14} /> Reprendre la photo
-                    </button>
+                    <div className="relative">
+                      <img src={form.selfieDataUrl} alt="selfie" className="w-56 h-44 object-cover rounded-xl border-2 border-green-300" />
+                      {selfieUploading && (
+                        <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+                          <RefreshCw size={22} className="text-white animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    {selfieUploading ? (
+                      <p className="text-xs text-gray-400">Envoi du selfie en cours…</p>
+                    ) : (
+                      <button type="button" onClick={() => { set('selfieDataUrl', null); startCamera() }}
+                        className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+                        <RefreshCw size={14} /> Reprendre la photo
+                      </button>
+                    )}
                   </div>
                 ) : cameraActive ? (
                   <div className="flex flex-col items-center gap-4">
@@ -905,7 +1039,7 @@ export default function RegisterTutorPage() {
 
               <button
                 onClick={handleSubmit}
-                disabled={loading || !form.selfieDataUrl}
+                disabled={loading || selfieUploading || !form.documents?.selfiePath}
                 className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
@@ -913,7 +1047,7 @@ export default function RegisterTutorPage() {
                   : 'Soumettre mon dossier'
                 }
               </button>
-              {!form.selfieDataUrl && (
+              {!form.documents?.selfiePath && !selfieUploading && (
                 <p className="text-center text-xs text-gray-400">Le selfie est requis pour compléter l'inscription.</p>
               )}
             </div>
@@ -924,11 +1058,11 @@ export default function RegisterTutorPage() {
             <div className="mt-6 pt-5 border-t border-gray-100">
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3">{error}</p>}
               <button
-                onClick={() => { setError(''); setStep(step + 1) }}
-                disabled={!canAdvance}
-                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleNext}
+                disabled={!canAdvance || stepSaving}
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Suivant →
+                {stepSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Suivant →'}
               </button>
             </div>
           )}

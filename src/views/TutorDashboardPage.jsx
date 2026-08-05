@@ -1,11 +1,13 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { useChatBubble } from '../context/ChatBubbleContext'
 import { supabase } from '../lib/supabase'
 import Avatar from '../components/common/Avatar'
+import Confetti from '../components/common/Confetti'
 import { VerifiedBadge, PremiumBadge, StatusBadge } from '../components/common/Badge'
 import {
   Eye, Calendar, Star, MessageCircle, Clock,
@@ -54,7 +56,17 @@ export default function TutorDashboardPage() {
   } = useApp()
   const { openChat } = useChatBubble()
   const { setSlot } = useHeaderSlot()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const tutor = currentUser
+
+  const [showConfetti, setShowConfetti] = useState(false)
+  useEffect(() => {
+    if (searchParams.get('welcome') === '1') {
+      setShowConfetti(true)
+      router.replace('/tableau-de-bord/repetiteur')
+    }
+  }, [searchParams, router])
 
   const [matchingParents, setMatchingParents]       = useState([])
   const [conversationPartners, setConversationPartners] = useState({})
@@ -263,6 +275,7 @@ export default function TutorDashboardPage() {
 
   return (
     <DashboardLayout>
+      {showConfetti && <Confetti onDone={() => setShowConfetti(false)} />}
       <div className="max-w-5xl mx-auto px-6 py-8">
 
         {/* Header */}

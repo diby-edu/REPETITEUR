@@ -1,7 +1,8 @@
 export const SUBJECTS = [
   'Mathématiques', 'Français', 'Anglais', 'Physique-Chimie', 'SVT',
   'Histoire-Géographie', 'Économie', 'Informatique', 'Philosophie',
-  'Arabe', 'Espagnol', 'Comptabilité', 'Droit'
+  'Arabe', 'Espagnol', 'Comptabilité', 'Droit',
+  'Allemand', 'Musique', 'Chinois', 'Marketing'
 ]
 
 export const LEVELS = ['Primaire', 'Collège', 'Lycée', 'Supérieur']

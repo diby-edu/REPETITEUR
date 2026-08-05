@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react'
 export default function CityCombobox({ value, onChange }) {
   const [query, setQuery] = useState(value || '')
   const [open, setOpen] = useState(false)
+  const [typing, setTyping] = useState(false)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -18,12 +19,13 @@ export default function CityCombobox({ value, onChange }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filtered = CITIES.filter(c => c.toLowerCase().includes(query.toLowerCase()))
+  const filtered = CITIES.filter(c => c.toLowerCase().includes((typing ? query : '').toLowerCase()))
 
   const select = (city) => {
     setQuery(city)
     onChange(city)
     setOpen(false)
+    setTyping(false)
   }
 
   return (
@@ -33,8 +35,8 @@ export default function CityCombobox({ value, onChange }) {
           className="input-field pr-8"
           placeholder="Rechercher une ville..."
           value={query}
-          onFocus={() => setOpen(true)}
-          onChange={e => { setQuery(e.target.value); onChange('') }}
+          onFocus={e => { setOpen(true); setTyping(false); e.target.select() }}
+          onChange={e => { setQuery(e.target.value); setTyping(true); onChange('') }}
         />
         <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
       </div>

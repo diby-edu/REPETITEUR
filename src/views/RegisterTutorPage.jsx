@@ -10,7 +10,7 @@ import CityCombobox from '../components/common/CityCombobox'
 import {
   CheckCircle, ChevronLeft, Upload, Clock, Home, Building2,
   Users, Wifi, FileText, Plus, Camera, RefreshCw,
-  Eye, EyeOff, Mail, Shield,
+  Eye, EyeOff, Mail, Shield, GraduationCap, X, Trash2,
 } from 'lucide-react'
 
 const STEPS = ['Compte', 'Vérification', 'Informations', 'Expertise', 'Documents', 'Selfie']
@@ -236,6 +236,12 @@ export default function RegisterTutorPage() {
     if (step !== 5 && cameraActive) stopCamera()
   }, [step, cameraActive, stopCamera])
 
+  // Primaire uniquement = polyvalent, pas de sélection de matières
+  const isPrimaireOnly = form.levels.length === 1 && form.levels[0] === 'Primaire'
+  useEffect(() => {
+    if (isPrimaireOnly && form.subjects.length > 0) set('subjects', [])
+  }, [isPrimaireOnly])
+
   // Timer renvoi OTP
   useEffect(() => {
     if (resendTimer > 0) {
@@ -414,8 +420,11 @@ export default function RegisterTutorPage() {
   // ── Validations par étape ─────────────────────────────────────
 
   const canAdvance = (() => {
-    if (step === 2) return !!(form.firstName && form.lastName && form.phone && form.city)
-    if (step === 3) return form.subjects.length > 0 && form.levels.length > 0 && form.monthlyRate && form.modalities.length > 0
+    if (step === 2) {
+      const quartierOk = QUARTIERS_BY_CITY[form.city]?.length > 0 ? !!form.quartier : true
+      return !!(form.firstName && form.lastName && form.phone && form.city && form.bio.trim() && quartierOk)
+    }
+    if (step === 3) return (isPrimaireOnly || form.subjects.length > 0) && form.levels.length > 0 && form.monthlyRate && form.modalities.length > 0
     if (step === 4) {
       const hasId = form.idType === 'cni' ? !!(form.cniRectoFile && form.cniVersoFile) : !!form.passportFile
       return hasId && diplomasReady
@@ -589,7 +598,7 @@ export default function RegisterTutorPage() {
               </div>
               <div>
                 <label htmlFor="reg-phone" className="block text-sm font-medium text-gray-700 mb-1.5">Téléphone *</label>
-                <input id="reg-phone" type="tel" className="input-field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+225 07 XX XX XX" />
+                <input id="reg-phone" type="tel" className="input-field" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="07 XX XX XX XX" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Ville *</label>
@@ -597,7 +606,7 @@ export default function RegisterTutorPage() {
               </div>
               {form.city && QUARTIERS_BY_CITY[form.city]?.length > 0 && (
                 <div>
-                  <label htmlFor="reg-quartier" className="block text-sm font-medium text-gray-700 mb-1.5">Quartier</label>
+                  <label htmlFor="reg-quartier" className="block text-sm font-medium text-gray-700 mb-1.5">Quartier *</label>
                   <select id="reg-quartier" className="input-field" value={form.quartier} onChange={e => set('quartier', e.target.value)}>
                     <option value="">Sélectionner un quartier</option>
                     {QUARTIERS_BY_CITY[form.city].map(q => <option key={q}>{q}</option>)}
@@ -605,11 +614,11 @@ export default function RegisterTutorPage() {
                 </div>
               )}
               <div>
-                <label htmlFor="reg-bio" className="block text-sm font-medium text-gray-700 mb-1.5">Biographie <span className="text-gray-400 font-normal">(optionnel)</span></label>
+                <label htmlFor="reg-bio" className="block text-sm font-medium text-gray-700 mb-1.5">Biographie *</label>
                 <textarea
                   id="reg-bio"
                   className="input-field resize-none h-28"
-                  placeholder="Décrivez votre expérience, votre méthode d'enseignement..."
+                  placeholder="Ex : Professeur de Mathématiques depuis 5 ans, diplômé de l'Université Félix Houphouët-Boigny. J'aide mes élèves à progresser grâce à une méthode pratique, avec des exercices adaptés à leur niveau et un suivi régulier des progrès..."
                   value={form.bio}
                   onChange={e => set('bio', e.target.value)}
                   maxLength={600}
@@ -625,18 +634,6 @@ export default function RegisterTutorPage() {
               <h2 className="font-semibold text-lg text-gray-800">Expertise & disponibilités</h2>
 
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Matières enseignées *</p>
-                <div className="flex flex-wrap gap-2">
-                  {SUBJECTS.map(s => (
-                    <button key={s} type="button" onClick={() => toggleItem('subjects', s)}
-                      className={`px-3 py-1.5 rounded-full text-sm border transition-all ${form.subjects.includes(s) ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:border-primary'}`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Niveaux *</p>
                 <div className="flex flex-wrap gap-2">
                   {LEVELS.map(l => (
@@ -647,6 +644,27 @@ export default function RegisterTutorPage() {
                   ))}
                 </div>
               </div>
+
+              {isPrimaireOnly ? (
+                <div className="flex items-start gap-2.5 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <GraduationCap size={16} className="text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-700">
+                    En tant qu'enseignant du primaire, vous êtes polyvalent : pas besoin de sélectionner de matières, vous couvrez l'ensemble du programme primaire.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Matières enseignées *</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SUBJECTS.map(s => (
+                      <button key={s} type="button" onClick={() => toggleItem('subjects', s)}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-all ${form.subjects.includes(s) ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:border-primary'}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="reg-rate" className="block text-sm font-medium text-gray-700 mb-1.5">Tarif mensuel (FCFA) *</label>
@@ -759,25 +777,42 @@ export default function RegisterTutorPage() {
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-700">Diplômes *</p>
                   <button type="button" onClick={() => set('diplomas', [...form.diplomas, { name: '', file: null }])}
-                    className="text-xs text-primary flex items-center gap-1 hover:underline">
+                    className="text-xs font-semibold text-primary bg-primary-50 hover:bg-primary-100 flex items-center gap-1 px-3 py-1.5 rounded-full transition-colors">
                     <Plus size={13} /> Ajouter un diplôme
                   </button>
                 </div>
                 <div className="space-y-3">
                   {form.diplomas.map((d, i) => {
                     const partialError = (d.name.trim() && !d.file) || (!d.name.trim() && !!d.file)
+                    const removeDiploma = () => {
+                      const next = form.diplomas.filter((_, idx) => idx !== i)
+                      set('diplomas', next.length > 0 ? next : [{ name: '', file: null }])
+                    }
+                    const clearFile = () => {
+                      const next = [...form.diplomas]
+                      next[i] = { ...next[i], file: null }
+                      set('diplomas', next)
+                    }
                     return (
                       <div key={i} className={`space-y-2 p-3 rounded-xl border ${partialError ? 'border-orange-300 bg-orange-50' : 'border-gray-100 bg-gray-50'}`}>
-                        <input
-                          className={`input-field text-sm ${partialError ? 'border-orange-300' : ''}`}
-                          placeholder={`Intitulé diplôme ${i + 1} (ex: Licence Mathématiques)`}
-                          value={d.name}
-                          onChange={e => {
-                            const next = [...form.diplomas]
-                            next[i] = { ...next[i], name: e.target.value }
-                            set('diplomas', next)
-                          }}
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            className={`input-field text-sm flex-1 uppercase ${partialError ? 'border-orange-300' : ''}`}
+                            placeholder={`Intitulé diplôme ${i + 1} (ex: Licence Mathématiques)`}
+                            value={d.name}
+                            onChange={e => {
+                              const next = [...form.diplomas]
+                              next[i] = { ...next[i], name: e.target.value.toUpperCase() }
+                              set('diplomas', next)
+                            }}
+                          />
+                          {(d.name || d.file || form.diplomas.length > 1) && (
+                            <button type="button" onClick={removeDiploma} aria-label="Supprimer ce diplôme"
+                              className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                              <X size={15} />
+                            </button>
+                          )}
+                        </div>
                         {d.name.trim() && (
                           <>
                             <input
@@ -791,15 +826,23 @@ export default function RegisterTutorPage() {
                                 set('diplomas', next)
                               }}
                             />
-                            <button type="button" onClick={() => document.getElementById(`diploma-file-${i}`)?.click()}
-                              className={`w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all ${
-                                d.file ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
-                              }`}>
-                              {d.file
-                                ? <><CheckCircle size={14} className="text-green-500 flex-shrink-0" /> {d.file.name}</>
-                                : <><Upload size={14} /> Fichier du diplôme *</>
-                              }
-                            </button>
+                            {d.file ? (
+                              <div className="w-full border-2 border-dashed border-green-400 bg-green-50 rounded-xl p-2.5 flex items-center gap-2 text-xs text-green-700">
+                                <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
+                                <button type="button" onClick={() => document.getElementById(`diploma-file-${i}`)?.click()} className="flex-1 text-left truncate hover:underline">
+                                  {d.file.name}
+                                </button>
+                                <button type="button" onClick={clearFile} aria-label="Supprimer le fichier"
+                                  className="flex-shrink-0 text-green-600 hover:text-red-500 transition-colors">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => document.getElementById(`diploma-file-${i}`)?.click()}
+                                className="w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all border-gray-300 hover:border-primary text-gray-500">
+                                <Upload size={14} /> Fichier du diplôme *
+                              </button>
+                            )}
                           </>
                         )}
                         {partialError && (
@@ -820,7 +863,7 @@ export default function RegisterTutorPage() {
           {step === 5 && (
             <div className="space-y-5">
               <div>
-                <h2 className="font-semibold text-lg text-gray-800 mb-1">Selfie avec pièce d'identité</h2>
+                <h2 className="font-semibold text-lg text-gray-800 mb-1">Selfie avec un justificatif d'identité</h2>
                 <p className="text-sm text-gray-500">Tenez votre pièce d'identité bien visible à côté de votre visage.</p>
               </div>
 
@@ -863,7 +906,7 @@ export default function RegisterTutorPage() {
               <button
                 onClick={handleSubmit}
                 disabled={loading || !form.selfieDataUrl}
-                className="btn-primary w-full flex items-center justify-center gap-2"
+                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
                   ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi en cours…</>

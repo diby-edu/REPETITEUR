@@ -159,12 +159,22 @@ export default function ParentDashboardPage() {
   })
 
   const upcomingSessions  = allSessions.filter(s => !isDatePast(s.scheduledDate))
+  const currentMonth      = new Date().toISOString().slice(0, 7)
+  const sessionsThisMonth = allSessions.filter(s => s.scheduledDate?.startsWith(currentMonth))
   const monthlySpend      = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
+  const favoriteIds       = new Set(favoriteTutors.map(t => t.id))
+
+  // Sessions this month per engagement (for improved contracts section)
+  const sessionsPerEng = {}
+  sessionsThisMonth.forEach(s => {
+    sessionsPerEng[s.engagementId] = (sessionsPerEng[s.engagementId] || 0) + 1
+  })
+
   const stats = [
-    { label: 'Séances planifiées',    value: upcomingSessions.length,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: upcomingSessions.length > 0 ? '↑ à venir' : '→ stable',       deltaClass: upcomingSessions.length > 0 ? 'text-green-600' : 'text-gray-400' },
-    { label: 'Contrats actifs',       value: activeEngagements.length,  emoji: '📋', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                                    deltaClass: 'text-gray-400' },
-    { label: 'Répétiteurs contactés', value: conversations.length,      emoji: '👨‍🏫', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: conversations.length > 0 ? '↑ en contact' : '→ stable',       deltaClass: conversations.length > 0 ? 'text-green-600' : 'text-gray-400' },
-    { label: 'Dépenses FCFA (mois)',  value: monthlySpend > 0 ? monthlySpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: monthlySpend >= 100000, delta: monthlySpend > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlySpend > 0 ? 'text-orange-500' : 'text-gray-400' },
+    { label: 'Séances planifiées',  value: upcomingSessions.length,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: upcomingSessions.length > 0 ? '↑ à venir' : '→ stable',       deltaClass: upcomingSessions.length > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Contrats actifs',     value: activeEngagements.length,  emoji: '📋', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                                    deltaClass: 'text-gray-400' },
+    { label: 'Séances ce mois',     value: sessionsThisMonth.length,  emoji: '📚', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionsToReport.length > 0 ? `${sessionsToReport.length} à confirmer` : '→ stable', deltaClass: sessionsToReport.length > 0 ? 'text-orange-500' : 'text-gray-400' },
+    { label: 'Dépenses FCFA (mois)', value: monthlySpend > 0 ? monthlySpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: monthlySpend >= 100000, delta: monthlySpend > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlySpend > 0 ? 'text-orange-500' : 'text-gray-400' },
   ]
 
   // ── Handlers ────────────────────────────────────────────────
@@ -220,9 +230,14 @@ export default function ParentDashboardPage() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="font-display text-xl font-bold text-gray-900">Bonjour, {parent.firstName} 👋</h1>
-          <p className="text-gray-400 text-sm mt-0.5">
-            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            {upcomingSessions.length > 0 && ` — ${upcomingSessions.length} séance${upcomingSessions.length > 1 ? 's' : ''} planifiée${upcomingSessions.length > 1 ? 's' : ''}`}
+          <p className="text-gray-400 text-sm mt-0.5 flex items-center gap-2 flex-wrap">
+            <span>{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            {upcomingSessions.length > 0 && <span>— {upcomingSessions.length} séance{upcomingSessions.length > 1 ? 's' : ''} planifiée{upcomingSessions.length > 1 ? 's' : ''}</span>}
+            {sessionsToReport.length > 0 && (
+              <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                <Clock size={11} /> {sessionsToReport.length} à confirmer
+              </span>
+            )}
           </p>
         </div>
 
@@ -286,60 +301,6 @@ export default function ParentDashboardPage() {
             </div>
           ))}
         </div>
-
-        {/* Répétiteurs disponibles — section principale */}
-        {matchingTutors.length > 0 && (
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold text-gray-900">🎯 Répétiteurs disponibles — {parent.city}</h2>
-              <p className="text-xs text-gray-400 mt-0.5">{matchingTutors.length} répétiteur{matchingTutors.length > 1 ? 's' : ''} · filtrés par matière</p>
-            </div>
-            <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {matchingTutors.slice(0, 6).map(t => (
-              <div key={t.id} className="border border-gray-100 rounded-xl p-4 flex flex-col gap-3 hover:shadow-sm transition-shadow">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                    style={{ backgroundColor: t.avatarColor || '#E87722' }}
-                  >
-                    {t.firstName?.[0]}{t.lastName?.[0]}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 text-sm leading-tight">{t.firstName} {t.lastName}</p>
-                    <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                      <MapPin size={10} /> {t.city}
-                      {t.rating > 0 && <span className="ml-1 text-accent font-semibold">★ {t.rating?.toFixed(1)}</span>}
-                    </p>
-                  </div>
-                </div>
-                {t.subjects?.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {t.subjects.slice(0, 3).map(s => (
-                      <span key={s} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
-                    ))}
-                    {t.subjects.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>}
-                  </div>
-                )}
-                {t.monthlyRate > 0 && <p className="text-sm font-black text-primary">{formatFCFA(t.monthlyRate)} / mois</p>}
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => handleContactTutor(t.id)}
-                    disabled={contactingId === t.id}
-                    className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5 disabled:opacity-60"
-                  >
-                    {contactingId === t.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={12} />}
-                    Contacter
-                  </button>
-                  <Link href={`/repetiteur/${t.id}`} className="btn-outline text-xs py-2 px-3 text-center">Profil</Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        )}
 
         {/* Séances à confirmer — prioritaire */}
         {sessionsToReport.length > 0 && (
@@ -439,6 +400,7 @@ export default function ParentDashboardPage() {
                 {[...activeEngagements, ...pendingEngagements].map(e => {
                   const t = getTutor(e.tutorId)
                   const days = daysUntil(e.endDate)
+                  const sessCount = sessionsPerEng[e.id] || 0
                   return (
                     <div key={e.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <Avatar user={t} size="sm" />
@@ -449,6 +411,15 @@ export default function ParentDashboardPage() {
                             ? (days < 0 ? 'Contrat expiré (renouvellement en attente)' : days === 0 ? "Se termine aujourd'hui" : `Se termine dans ${days} j`)
                             : "En attente d'acceptation du répétiteur"}
                         </p>
+                        {e.status === 'active' && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {sessCount} séance{sessCount !== 1 ? 's' : ''} ce mois
+                            {' · '}{formatFCFA(e.monthlyRate)}/mois
+                            {days >= 0 && days <= 7 && (
+                              <span className="ml-1 text-orange-500 font-semibold">· Règlement dans {days} j</span>
+                            )}
+                          </p>
+                        )}
                       </div>
                       <span className={`text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap ${e.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                         {e.status === 'active' ? 'Actif' : 'En attente'}
@@ -521,6 +492,72 @@ export default function ParentDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Répétiteurs disponibles — en bas si contrats actifs, en haut sinon (géré par l'ordre de rendu) */}
+        {matchingTutors.length > 0 && (
+          <div className="card mt-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">🎯 Répétiteurs disponibles — {parent.city}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {matchingTutors.length} répétiteur{matchingTutors.length > 1 ? 's' : ''} · filtrés par matière
+                  {favoriteTutors.length > 0 && ` · ★ favoris en tête`}
+                </p>
+              </div>
+              <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                ...matchingTutors.filter(t => favoriteIds.has(t.id)),
+                ...matchingTutors.filter(t => !favoriteIds.has(t.id)),
+              ].slice(0, 6).map(t => {
+                const isFav = favoriteIds.has(t.id)
+                return (
+                  <div key={t.id} className={`border rounded-xl p-4 flex flex-col gap-3 hover:shadow-sm transition-shadow ${isFav ? 'border-accent/40 bg-accent/5' : 'border-gray-100'}`}>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                        style={{ backgroundColor: t.avatarColor || '#E87722' }}
+                      >
+                        {t.firstName?.[0]}{t.lastName?.[0]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 text-sm leading-tight flex items-center gap-1.5">
+                          {t.firstName} {t.lastName}
+                          {isFav && <span className="text-accent text-base leading-none">★</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={10} /> {t.city}
+                          {t.rating > 0 && <span className="ml-1 text-accent font-semibold">★ {t.rating?.toFixed(1)}</span>}
+                        </p>
+                      </div>
+                    </div>
+                    {t.subjects?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {t.subjects.slice(0, 3).map(s => (
+                          <span key={s} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
+                        ))}
+                        {t.subjects.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>}
+                      </div>
+                    )}
+                    {t.monthlyRate > 0 && <p className="text-sm font-black text-primary">{formatFCFA(t.monthlyRate)} / mois</p>}
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => handleContactTutor(t.id)}
+                        disabled={contactingId === t.id}
+                        className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {contactingId === t.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={12} />}
+                        Contacter
+                      </button>
+                      <Link href={`/repetiteur/${t.id}`} className="btn-outline text-xs py-2 px-3 text-center">Profil</Link>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* CTA vide */}
         {activeEngagements.length === 0 && pendingEngagements.length === 0 && conversations.length === 0 && (

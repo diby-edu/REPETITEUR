@@ -208,12 +208,53 @@ export default function TutorDashboardPage() {
   const isPremium         = tutor.subscription?.plan === 'premium'
   const hasId             = tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni
 
-  const monthlyRevenue = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
+  const monthlyRevenue    = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
+  const pendingRevenue    = pendingPayments.reduce((sum, p) => sum + (p.amount || p.engagement?.monthly_rate || 0), 0)
+  const confirmedRevenue  = monthlyRevenue - pendingRevenue
+
+  // Delta vs mois précédent (calculé à partir de allSessions déjà chargés)
+  const prevMonthStr          = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7)
+  const prevMonthSessionCount = allSessions.filter(s => s.scheduledDate?.startsWith(prevMonthStr)).length
+  const sessionDelta          = monthSessionCount - prevMonthSessionCount
+
+  // Profil completion score (5 champs = 20% each)
+  const profileChecks = [
+    { label: 'Bio renseignée',      done: tutor.bio?.trim().length > 10,    href: '/parametres' },
+    { label: 'Matières ajoutées',   done: tutor.subjects?.length > 0,       href: '/parametres' },
+    { label: 'Niveaux renseignés',  done: tutor.levels?.length > 0,         href: '/parametres' },
+    { label: 'Tarif mensuel',       done: tutor.monthlyRate > 0,            href: '/parametres' },
+    { label: 'Documents soumis',    done: !!hasId,                          href: '/parametres?tab=Documents' },
+  ]
+  const profileScore = profileChecks.filter(c => c.done).length
+  const profilePct   = Math.round((profileScore / profileChecks.length) * 100)
+
   const stats = [
-    { label: 'Séances ce mois',   value: monthSessionCount,                                              emoji: '📅', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                         deltaClass: 'text-gray-400' },
-    { label: 'Revenus FCFA (mois)', value: monthlyRevenue > 0 ? monthlyRevenue.toLocaleString('fr-FR') : '0', emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: monthlyRevenue >= 100000, delta: monthlyRevenue > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlyRevenue > 0 ? 'text-green-600' : 'text-gray-400' },
-    { label: 'Familles actives',  value: activeEngagements.length,                                        emoji: '👨‍👩‍👧', bg: 'bg-primary-50', bar: 'bg-primary', delta: '→ stable',                                           deltaClass: 'text-gray-400' },
-    { label: 'Note moyenne',      value: tutor.rating > 0 ? tutor.rating.toFixed(1) : '—',               emoji: '⭐', bg: 'bg-yellow-50',   bar: 'bg-accent',   delta: tutor.rating > 0 ? '↑ en hausse' : '→ stable',         deltaClass: tutor.rating > 0 ? 'text-green-600' : 'text-gray-400' },
+    {
+      label: 'Séances ce mois', value: monthSessionCount, emoji: '📅',
+      bg: 'bg-secondary-50', bar: 'bg-secondary',
+      delta: sessionDelta > 0 ? `↑ +${sessionDelta} vs mois dernier` : sessionDelta < 0 ? `↓ ${sessionDelta} vs mois dernier` : '→ stable vs mois dernier',
+      deltaClass: sessionDelta > 0 ? 'text-green-600' : sessionDelta < 0 ? 'text-red-500' : 'text-gray-400',
+    },
+    {
+      label: 'Revenus FCFA (mois)', value: monthlyRevenue > 0 ? monthlyRevenue.toLocaleString('fr-FR') : '0',
+      emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: monthlyRevenue >= 100000,
+      subValue: pendingRevenue > 0 ? `✓ Confirmés : ${formatFCFA(confirmedRevenue)}` : null,
+      subClass: 'text-green-600',
+      delta: pendingRevenue > 0 ? `⏳ En attente : ${formatFCFA(pendingRevenue)}` : monthlyRevenue > 0 ? '✓ Tout confirmé' : '→ stable',
+      deltaClass: pendingRevenue > 0 ? 'text-orange-500' : monthlyRevenue > 0 ? 'text-green-600' : 'text-gray-400',
+    },
+    {
+      label: 'Familles actives', value: activeEngagements.length, emoji: '👨‍👩‍👧',
+      bg: 'bg-primary-50', bar: 'bg-primary',
+      delta: pendingEngagements.length > 0 ? `${pendingEngagements.length} demande${pendingEngagements.length > 1 ? 's' : ''} en attente` : '→ stable',
+      deltaClass: pendingEngagements.length > 0 ? 'text-blue-500' : 'text-gray-400',
+    },
+    {
+      label: 'Note moyenne', value: tutor.rating > 0 ? tutor.rating.toFixed(1) : '—', emoji: '⭐',
+      bg: 'bg-yellow-50', bar: 'bg-accent',
+      delta: tutor.reviewCount > 0 ? `${tutor.reviewCount} avis` : '→ stable',
+      deltaClass: tutor.reviewCount > 0 ? 'text-green-600' : 'text-gray-400',
+    },
   ]
 
   const PAY_LABELS = { cash: 'Cash', orange_money: 'Orange Money', wave: 'Wave', mtn_money: 'MTN Money' }
@@ -342,6 +383,36 @@ export default function TutorDashboardPage() {
           )}
         </div>
 
+        {/* Barre de complétion du profil — masquée si 100% */}
+        {profilePct < 100 && (
+          <div className="card mb-5 border-primary/20 bg-primary-50/30">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-bold text-gray-900">Votre profil — <span className="text-primary">{profilePct}% complet</span></p>
+                <p className="text-xs text-gray-500 mt-0.5">Un profil complet est mieux référencé dans les recherches</p>
+              </div>
+              <span className="text-2xl font-black text-primary">{profilePct}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+              <div
+                className="bg-primary h-2 rounded-full transition-all duration-700"
+                style={{ width: `${profilePct}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {profileChecks.filter(c => !c.done).map(c => (
+                <Link
+                  key={c.label}
+                  href={c.href}
+                  className="text-xs px-2.5 py-1 rounded-full border border-primary/30 text-primary bg-white hover:bg-primary-50 font-medium transition-colors flex items-center gap-1"
+                >
+                  <span className="text-gray-300">+</span> {c.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {stats.map((s, i) => (
@@ -351,7 +422,8 @@ export default function TutorDashboardPage() {
               <div className="min-w-0">
                 <p className={`font-black text-gray-900 tabular-nums leading-none ${s.bigVal ? 'text-[17px]' : 'text-[22px]'}`}>{s.value}</p>
                 <p className="text-[11px] text-gray-400 mt-1.5 font-semibold leading-tight">{s.label}</p>
-                {s.delta && <p className={`text-[10px] font-bold mt-1 ${s.deltaClass}`}>{s.delta}</p>}
+                {s.subValue && <p className={`text-[10px] font-bold mt-0.5 ${s.subClass}`}>{s.subValue}</p>}
+                {s.delta && <p className={`text-[10px] font-bold mt-0.5 ${s.deltaClass}`}>{s.delta}</p>}
               </div>
             </div>
           ))}
@@ -412,46 +484,173 @@ export default function TutorDashboardPage() {
           </div>
         )}
 
+        {/* Parents qui cherchent — remonté avant l'agenda pour visibilité */}
+        <div className="mt-6 mb-5">
+          <div className="mb-3">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2 text-sm">
+              <Users size={17} className="text-secondary" />
+              Parents qui cherchent un répétiteur à {tutor.city}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {matchingParents.length > 0
+                ? `${matchingParents.length} parent${matchingParents.length > 1 ? 's' : ''} correspondent à votre profil`
+                : "Aucun parent correspondant pour l'instant"}
+            </p>
+          </div>
+
+          {matchingParents.length === 0 ? (
+            <div className="card text-center py-8">
+              <Users size={36} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Aucun parent dans votre ville n'a encore activé le contact répétiteur.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {matchingParents.map(par => (
+                <div key={par.id} className="card flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                      style={{ backgroundColor: par.avatarColor || '#16A085' }}
+                    >
+                      {par.firstName?.[0]}{par.lastName?.[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm">{par.firstName} {par.lastName?.[0]}.</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={11} /> {par.city}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {par.childLevels?.length > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <GraduationCap size={13} className="text-secondary flex-shrink-0" />
+                        <span>Niveau : <strong>{par.childLevels.join(', ')}</strong></span>
+                      </div>
+                    )}
+                    {par.subjectsNeeded?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {par.subjectsNeeded.slice(0, 3).map(s => (
+                          <span key={s} className={`text-xs px-2 py-0.5 rounded-full font-medium ${tutor.subjects?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
+                        ))}
+                        {par.subjectsNeeded.length > 3 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{par.subjectsNeeded.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleContactParent(par.id)}
+                    disabled={contactingId === par.id}
+                    className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    {contactingId === par.id
+                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : <Send size={13} />}
+                    Contacter
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="grid md:grid-cols-2 gap-5">
-          {/* Agenda */}
+          {/* Agenda semaine — grille 7 jours */}
           <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-900">📅 Agenda — {MONTHS_FR_LONG[new Date().getMonth()]}</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900">📅 Semaine en cours</h2>
               <Link href="/reservations" className="text-xs text-primary font-medium hover:underline">Voir tout</Link>
             </div>
-            {upcomingSessions.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar size={36} className="text-gray-200 mx-auto mb-3" />
-                <p className="text-sm text-gray-400">
-                  {activeEngagements.length === 0 ? 'Aucun contrat actif' : 'Aucune séance à venir'}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {upcomingSessions.map(s => {
-                  const eng = engagements.find(e => e.id === s.engagementId)
-                  const par = eng ? parentProfiles[eng.parentId] : null
-                  const d   = toDate(s.scheduledDate)
-                  const pill = sessionPill(s.scheduledDate)
-                  return (
-                    <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className="w-11 text-center flex-shrink-0">
-                        <span className="text-xl font-black text-gray-800 leading-none block">{d.getDate()}</span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">{MONTHS_FR[d.getMonth()]}</span>
-                      </div>
-                      <div className="w-px h-9 bg-gray-200 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
-                          {eng?.subject}{par ? ` — ${par.firstName} ${par.lastName}` : ''}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{s.scheduledTime?.slice(0, 5)} · {s.durationMinutes} min</p>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap ${pill.cls}`}>{pill.label}</span>
+            {(() => {
+              const SUBJ_COLORS = [
+                'bg-primary/10 text-primary border-primary/20',
+                'bg-blue-50 text-blue-700 border-blue-100',
+                'bg-green-50 text-green-700 border-green-100',
+                'bg-purple-50 text-purple-700 border-purple-100',
+                'bg-orange-50 text-orange-700 border-orange-100',
+              ]
+              const subjColorMap = {}
+              let colorIdx = 0
+              const getSubjColor = (subject) => {
+                if (!subjColorMap[subject]) subjColorMap[subject] = SUBJ_COLORS[colorIdx++ % SUBJ_COLORS.length]
+                return subjColorMap[subject]
+              }
+              const today   = new Date()
+              const todayStr = today.toISOString().split('T')[0]
+              const dow = today.getDay()
+              const monday = new Date(today)
+              monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+              monday.setHours(0, 0, 0, 0)
+              const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+              const weekDates = Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(monday)
+                d.setDate(monday.getDate() + i)
+                return d
+              })
+              const sessionsThisWeek = allSessions.filter(s => {
+                const d = toDate(s.scheduledDate)
+                return d >= monday && d <= new Date(monday.getTime() + 6 * 86400000 + 86399999)
+              })
+              const hasSessions = sessionsThisWeek.length > 0
+              return (
+                <div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {weekDates.map((date, i) => {
+                      const dateStr = date.toISOString().split('T')[0]
+                      const isToday = dateStr === todayStr
+                      const isPast  = date < new Date(new Date().toDateString())
+                      const daySessions = sessionsThisWeek.filter(s => s.scheduledDate === dateStr)
+                      return (
+                        <div key={i} className={`flex flex-col items-center gap-1 rounded-xl py-2 px-0.5 transition-colors ${isToday ? 'bg-primary/8 ring-1 ring-primary/20' : ''}`}>
+                          <span className={`text-[9px] font-black uppercase tracking-wide ${isToday ? 'text-primary' : isPast ? 'text-gray-300' : 'text-gray-400'}`}>
+                            {WEEK_DAYS[i]}
+                          </span>
+                          <span className={`text-sm font-black leading-none ${isToday ? 'text-primary' : isPast ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {date.getDate()}
+                          </span>
+                          <div className="flex flex-col gap-0.5 w-full mt-0.5">
+                            {daySessions.length === 0 && (
+                              <div className="h-1 rounded-full bg-gray-100 mx-1" />
+                            )}
+                            {daySessions.slice(0, 3).map(s => {
+                              const eng = engagements.find(e => e.id === s.engagementId)
+                              return (
+                                <div
+                                  key={s.id}
+                                  title={`${eng?.subject || '?'} · ${s.scheduledTime?.slice(0,5) || ''}`}
+                                  className={`w-full h-1.5 rounded-full border ${getSubjColor(eng?.subject || '?')}`}
+                                />
+                              )
+                            })}
+                            {daySessions.length > 3 && (
+                              <span className="text-[8px] text-center text-gray-400 font-bold">+{daySessions.length - 3}</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {hasSessions ? (
+                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                      {sessionsThisWeek.slice(0, 4).map(s => {
+                        const eng = engagements.find(e => e.id === s.engagementId)
+                        const par = eng ? parentProfiles[eng.parentId] : null
+                        const d   = toDate(s.scheduledDate)
+                        return (
+                          <div key={s.id} className="flex items-center gap-2">
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.scheduledDate === todayStr ? 'bg-primary' : 'bg-gray-300'}`} />
+                            <span className="text-[11px] text-gray-500 w-8 flex-shrink-0 tabular-nums">{WEEK_DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()}</span>
+                            <span className="text-[11px] font-semibold text-gray-800 truncate flex-1">{eng?.subject}{par ? ` · ${par.firstName}` : ''}</span>
+                            <span className="text-[10px] text-gray-400 flex-shrink-0">{s.scheduledTime?.slice(0,5)}</span>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
-            )}
+                  ) : (
+                    <p className="text-center text-xs text-gray-400 mt-4 pb-2">Aucune séance cette semaine</p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Contrats actifs */}
@@ -588,74 +787,6 @@ export default function TutorDashboardPage() {
           </div>
         </div>
 
-        {/* Parents qui cherchent */}
-        <div className="mt-6">
-          <div className="mb-4">
-            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-              <Users size={18} className="text-secondary" />
-              Parents qui cherchent un répétiteur à {tutor.city}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {matchingParents.length > 0
-                ? `${matchingParents.length} parent${matchingParents.length > 1 ? 's' : ''} correspondent à votre profil`
-                : "Aucun parent correspondant pour l'instant"}
-            </p>
-          </div>
-
-          {matchingParents.length === 0 ? (
-            <div className="card text-center py-10">
-              <Users size={40} className="text-gray-200 mx-auto mb-3" />
-              <p className="text-sm text-gray-400">Aucun parent dans votre ville n'a encore activé le contact répétiteur.</p>
-            </div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {matchingParents.map(par => (
-                <div key={par.id} className="card flex flex-col gap-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                      style={{ backgroundColor: par.avatarColor || '#16A085' }}
-                    >
-                      {par.firstName?.[0]}{par.lastName?.[0]}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm">{par.firstName} {par.lastName?.[0]}.</p>
-                      <p className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={11} /> {par.city}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    {par.childLevels?.length > 0 && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <GraduationCap size={13} className="text-secondary flex-shrink-0" />
-                        <span>Niveau : <strong>{par.childLevels.join(', ')}</strong></span>
-                      </div>
-                    )}
-                    {par.subjectsNeeded?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {par.subjectsNeeded.slice(0, 3).map(s => (
-                          <span key={s} className={`text-xs px-2 py-0.5 rounded-full font-medium ${tutor.subjects?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
-                        ))}
-                        {par.subjectsNeeded.length > 3 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{par.subjectsNeeded.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleContactParent(par.id)}
-                    disabled={contactingId === par.id}
-                    className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    {contactingId === par.id
-                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      : <Send size={13} />}
-                    Contacter
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Modal confirmation de paiement ──────────────────────── */}

@@ -83,6 +83,74 @@ function VerticalBars({ bars, height = 128 }) {
   )
 }
 
+function SparklineChart({ data, height = 80 }) {
+  if (!data || data.length < 2) return null
+  const W = 360, H = height
+  const PAD = { top: 8, right: 8, bottom: 28, left: 28 }
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+
+  const maxVal = Math.max(...data.map(d => d.total), 1)
+  const xStep  = innerW / (data.length - 1)
+
+  const pts = (key) => data.map((d, i) => [
+    PAD.left + i * xStep,
+    PAD.top + innerH - (d[key] / maxVal) * innerH,
+  ])
+
+  const polyline = (points) => points.map(p => p.join(',')).join(' ')
+  const area     = (points) => [
+    `M ${points[0][0]} ${PAD.top + innerH}`,
+    ...points.map(p => `L ${p[0]} ${p[1]}`),
+    `L ${points[points.length - 1][0]} ${PAD.top + innerH}`,
+    'Z',
+  ].join(' ')
+
+  const tutorPts  = pts('tutors')
+  const parentPts = pts('parents')
+  const totalPts  = pts('total')
+
+  const yTicks = [0, Math.round(maxVal / 2), maxVal]
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }}>
+      {/* Y grid */}
+      {yTicks.map((v, i) => {
+        const y = PAD.top + innerH - (v / maxVal) * innerH
+        return (
+          <g key={i}>
+            <line x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y} stroke="#f3f4f6" strokeWidth={1} />
+            <text x={PAD.left - 4} y={y + 3.5} textAnchor="end" fontSize={8} fill="#9ca3af">{v}</text>
+          </g>
+        )
+      })}
+
+      {/* Area fills */}
+      <path d={area(totalPts)}  fill="#2D6A4F" fillOpacity={0.06} />
+      <path d={area(tutorPts)}  fill="#2D6A4F" fillOpacity={0.12} />
+      <path d={area(parentPts)} fill="#3b82f6" fillOpacity={0.10} />
+
+      {/* Lines */}
+      <polyline points={polyline(totalPts)}  fill="none" stroke="#d1d5db" strokeWidth={1.5} strokeDasharray="4 2" />
+      <polyline points={polyline(tutorPts)}  fill="none" stroke="#2D6A4F" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={polyline(parentPts)} fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Dots on last point */}
+      {[{ pts: tutorPts, color: '#2D6A4F' }, { pts: parentPts, color: '#3b82f6' }].map(({ pts: p, color }, ki) => {
+        const last = p[p.length - 1]
+        return <circle key={ki} cx={last[0]} cy={last[1]} r={3} fill={color} stroke="white" strokeWidth={1.5} />
+      })}
+
+      {/* X labels */}
+      {data.map((d, i) => (
+        <text key={i} x={PAD.left + i * xStep} y={H - 6} textAnchor="middle" fontSize={9} fill="#6b7280" fontWeight="600">
+          {d.label}
+        </text>
+      ))}
+    </svg>
+  )
+}
+
 export default function AdminDashboardPage() {
   const { tutors, validateTutor, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
@@ -95,10 +163,12 @@ export default function AdminDashboardPage() {
     if (tab === 'Vue globale') router.push('/admin')
     else router.push('/admin?tab=' + encodeURIComponent(tab))
   }
-  const [rejectModal, setRejectModal] = useState(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [userFilter, setUserFilter]   = useState('')
-  const [parents, setParents]         = useState([])
+  const [rejectModal, setRejectModal]       = useState(null)
+  const [rejectReason, setRejectReason]     = useState('')
+  const [userFilter, setUserFilter]         = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState('all')   // 'all' | 'tutor' | 'parent'
+  const [userStatusFilter, setUserStatusFilter] = useState('all') // 'all' | 'verified' | 'pending' | 'rejected'
+  const [parents, setParents]               = useState([])
 
   // Engagement / session / payment stats
   const [engStats, setEngStats]         = useState({ pending: 0, active: 0, ended: 0 })
@@ -115,6 +185,9 @@ export default function AdminDashboardPage() {
   const [weekStats, setWeekStats]       = useState({ tutors: 0, parents: 0, engagements: 0, sessions: 0 })
   const [monthSessionCount, setMonthSessionCount] = useState(0)
   const [parentMonthCount, setParentMonthCount]   = useState(0)
+  const [period, setPeriod]             = useState('30d')
+  const [periodStats, setPeriodStats]   = useState({ tutors: 0, parents: 0, engagements: 0, sessions: 0 })
+  const [growthData, setGrowthData]     = useState([])
 
   // ── Load data ────────────────────────────────────────────────
   useEffect(() => {
@@ -196,6 +269,28 @@ export default function AdminDashboardPage() {
         })))
       })
 
+    // Croissance inscriptions — 6 derniers mois
+    ;(async () => {
+      const now = new Date()
+      const months = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+        return { year: d.getFullYear(), month: d.getMonth() + 1, label: d.toLocaleDateString('fr-FR', { month: 'short' }) }
+      })
+      const firstDay = `${months[0].year}-${String(months[0].month).padStart(2, '0')}-01`
+      const { data: allProfs } = await supabase.from('profiles').select('join_date, role').gte('join_date', firstDay)
+      const buckets = months.map(m => ({ label: m.label, tutors: 0, parents: 0, total: 0 }))
+      allProfs?.forEach(p => {
+        if (!p.join_date) return
+        const [y, mo] = p.join_date.split('-').map(Number)
+        const idx = months.findIndex(m => m.year === y && m.month === mo)
+        if (idx < 0) return
+        buckets[idx].total++
+        if (p.role === 'tutor')  buckets[idx].tutors++
+        if (p.role === 'parent') buckets[idx].parents++
+      })
+      setGrowthData(buckets)
+    })()
+
     // Realtime: reload tutors on changes
     const channel = supabase
       .channel('admin-tutors-realtime')
@@ -204,6 +299,23 @@ export default function AdminDashboardPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [reloadTutors])
+
+  // ── Period stats (Vue globale selector) ─────────────────────
+  useEffect(() => {
+    const now = new Date()
+    let startDate
+    if (period === '7d')  { const d = new Date(now); d.setDate(now.getDate() - 6);           startDate = d.toISOString().split('T')[0] }
+    if (period === '30d') { const d = new Date(now); d.setDate(now.getDate() - 29);          startDate = d.toISOString().split('T')[0] }
+    if (period === '3m')  { const d = new Date(now); d.setMonth(now.getMonth() - 3);         startDate = d.toISOString().split('T')[0] }
+    if (period === '12m') { const d = new Date(now); d.setFullYear(now.getFullYear() - 1);   startDate = d.toISOString().split('T')[0] }
+    if (!startDate) return
+    Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'tutor').gte('join_date', startDate),
+      supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'parent').gte('join_date', startDate),
+      supabase.from('engagements').select('*', { count: 'exact', head: true }).gte('created_at', startDate),
+      supabase.from('sessions').select('*', { count: 'exact', head: true }).gte('scheduled_date', startDate),
+    ]).then(([t, p, e, s]) => setPeriodStats({ tutors: t.count || 0, parents: p.count || 0, engagements: e.count || 0, sessions: s.count || 0 }))
+  }, [period])
 
   // ── Load Paiements tab ───────────────────────────────────────
   useEffect(() => {
@@ -317,7 +429,11 @@ export default function AdminDashboardPage() {
 
   const filteredUsers = [...tutors, ...parents].filter(u => {
     const q = userFilter.toLowerCase()
-    return !q || `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
+    if (q && !`${u.firstName} ${u.lastName}`.toLowerCase().includes(q) && !u.email?.toLowerCase().includes(q)) return false
+    if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false
+    if (userStatusFilter !== 'all' && u.role === 'tutor' && u.verificationStatus !== userStatusFilter) return false
+    if (userStatusFilter !== 'all' && u.role === 'parent') return false
+    return true
   })
 
   const totalEngagements = engStats.pending + engStats.active + engStats.ended
@@ -545,13 +661,26 @@ export default function AdminDashboardPage() {
               </div>
 
               <div className="card">
-                <h3 className="text-sm font-bold text-gray-900 mb-3">📊 Cette semaine</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-gray-900">📊 Activité</h3>
+                  <div className="flex gap-1">
+                    {[['7d','7j'],['30d','30j'],['3m','3m'],['12m','12m']].map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setPeriod(key)}
+                        className={`text-[10px] font-bold px-2 py-1 rounded-lg transition-colors ${period === key ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: 'Nouveaux répét.',   value: `+${weekStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
-                    { label: 'Nouveaux parents',  value: `+${weekStats.parents}`,     bg: 'bg-blue-50',      color: 'text-blue-600' },
-                    { label: 'Nouveaux contrats', value: `+${weekStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
-                    { label: 'Séances planif.',   value: `+${weekStats.sessions}`,    bg: 'bg-purple-50',    color: 'text-purple-600' },
+                    { label: 'Nouveaux répét.',   value: `+${periodStats.tutors}`,      bg: 'bg-primary-50',   color: 'text-primary' },
+                    { label: 'Nouveaux parents',  value: `+${periodStats.parents}`,     bg: 'bg-blue-50',      color: 'text-blue-600' },
+                    { label: 'Nouveaux contrats', value: `+${periodStats.engagements}`, bg: 'bg-green-50',     color: 'text-green-600' },
+                    { label: 'Séances planif.',   value: `+${periodStats.sessions}`,    bg: 'bg-purple-50',    color: 'text-purple-600' },
                   ].map(item => (
                     <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center`}>
                       <p className={`text-xl font-black ${item.color} tabular-nums`}>{item.value}</p>
@@ -561,6 +690,32 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             </div>
+            {/* Sparkline — croissance inscriptions 6 mois */}
+            {growthData.length > 0 && (
+              <div className="card">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={15} className="text-secondary" />
+                    <h3 className="text-sm font-bold text-gray-900">Croissance des inscriptions</h3>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] font-semibold text-gray-500">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-secondary inline-block" />Répétiteurs</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />Parents</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-gray-300 inline-block" />Total</span>
+                  </div>
+                </div>
+                <SparklineChart data={growthData} height={90} />
+                <div className="flex justify-between mt-2 pt-2 border-t border-gray-100">
+                  {growthData.slice(-3).map((d, i) => (
+                    <div key={i} className="text-center">
+                      <p className="text-base font-black text-gray-900 tabular-nums">{d.total}</p>
+                      <p className="text-[10px] text-gray-400 font-medium capitalize">{d.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         )}
 
@@ -701,6 +856,7 @@ export default function AdminDashboardPage() {
         {/* ── Tab: Utilisateurs ───────────────────────────────── */}
         {activeTab === 'Utilisateurs' && (
           <div className="space-y-4">
+            {/* Barre de recherche */}
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
               <Search size={16} className="text-gray-400" />
               <input
@@ -709,6 +865,37 @@ export default function AdminDashboardPage() {
                 value={userFilter}
                 onChange={e => setUserFilter(e.target.value)}
               />
+              {userFilter && (
+                <button onClick={() => setUserFilter('')} className="text-gray-400 hover:text-gray-600 text-xs font-medium">✕</button>
+              )}
+            </div>
+            {/* Filtres chips */}
+            <div className="flex flex-wrap gap-2">
+              <span className="text-xs text-gray-500 font-semibold self-center">Rôle :</span>
+              {[['all', 'Tous'], ['tutor', 'Répétiteurs'], ['parent', 'Parents']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => { setUserRoleFilter(val); if (val === 'parent') setUserStatusFilter('all') }}
+                  className={`text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${userRoleFilter === val ? 'bg-secondary text-white border-secondary' : 'bg-white text-gray-600 border-gray-200 hover:border-secondary/40'}`}
+                >
+                  {label}
+                </button>
+              ))}
+              {userRoleFilter !== 'parent' && (
+                <>
+                  <span className="text-xs text-gray-500 font-semibold self-center ml-2">Statut :</span>
+                  {[['all', 'Tous'], ['verified', 'Vérifiés'], ['pending', 'En attente'], ['rejected', 'Rejetés']].map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => setUserStatusFilter(val)}
+                      className={`text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${userStatusFilter === val ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary/40'}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </>
+              )}
+              <span className="text-xs text-gray-400 self-center ml-auto">{filteredUsers.length} utilisateur{filteredUsers.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="space-y-3">
               {filteredUsers.map(user => (

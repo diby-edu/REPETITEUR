@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
 import {
   LayoutDashboard, Calendar, BookOpen, LogOut, Users, ShieldCheck,
-  CreditCard, FileText, Wallet, Star,
+  CreditCard, FileText, Wallet, Star, Bell, Heart, Settings, X,
 } from 'lucide-react'
 
 const NAV = {
@@ -14,10 +14,15 @@ const NAV = {
     { label: 'Tableau de bord', href: '/tableau-de-bord/repetiteur', icon: LayoutDashboard },
     { label: 'Séances',         href: '/reservations',               icon: Calendar },
     { label: 'Abonnement',      href: '/abonnement',                 icon: BookOpen },
+    { label: 'Notifications',   href: '/notifications',              icon: Bell },
+    { label: 'Paramètres',      href: '/parametres',                 icon: Settings },
   ],
   parent: [
     { label: 'Tableau de bord', href: '/tableau-de-bord/parent', icon: LayoutDashboard },
     { label: 'Séances',         href: '/reservations',           icon: Calendar },
+    { label: 'Favoris',         href: '/favoris',                icon: Heart },
+    { label: 'Notifications',   href: '/notifications',          icon: Bell },
+    { label: 'Paramètres',      href: '/parametres',             icon: Settings },
   ],
   admin: [
     { label: 'Vue globale',   href: '/admin',                       icon: LayoutDashboard },
@@ -32,7 +37,7 @@ const NAV = {
 
 const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Administrateur' }
 
-export default function DashboardSidebar() {
+export default function DashboardSidebar({ isOpen = false, onClose = () => {} }) {
   const { currentUser, logout } = useAuth()
   const { getUserEngagements, getAllUserSessions, getUserConversations, tutors } = useApp()
   const pathname    = usePathname()
@@ -92,19 +97,29 @@ export default function DashboardSidebar() {
 
   return (
     <aside
-      className="w-60 flex-shrink-0 flex flex-col h-full overflow-y-auto z-10"
+      className={`
+        fixed inset-y-0 left-0 z-50 w-64 flex flex-col h-full overflow-y-auto
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:static md:z-auto md:w-60 md:flex-shrink-0 md:translate-x-0
+      `}
       style={{ background: 'linear-gradient(180deg, #1B4332 0%, #2D6A4F 100%)' }}
     >
-      {/* Logo */}
+      {/* Logo + mobile close */}
       <div className="px-5 pt-5 pb-4 border-b border-white/10 flex-shrink-0">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-display font-bold text-base">M</span>
-          </div>
-          <span className="font-display font-bold text-[15px] text-white">
-            Mon<span className="text-accent-400">Répétiteur</span>
-          </span>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/" onClick={onClose} className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-display font-bold text-base">M</span>
+            </div>
+            <span className="font-display font-bold text-[15px] text-white">
+              Mon<span className="text-accent-400">Répétiteur</span>
+            </span>
+          </Link>
+          <button type="button" onClick={onClose} className="md:hidden w-7 h-7 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors" aria-label="Fermer">
+            <X size={16} />
+          </button>
+        </div>
       </div>
 
       {/* User profile */}
@@ -125,20 +140,29 @@ export default function DashboardSidebar() {
 
       {/* Nav items */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {items.map(({ label, href, icon: Icon }) => (
-          <Link
-            key={href + label}
-            href={href}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              isActive(href)
-                ? 'bg-white/22 text-white shadow-sm'
-                : 'text-white/60 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            <Icon size={17} className="flex-shrink-0" />
-            {label}
-          </Link>
-        ))}
+        {items.map(({ label, href, icon: Icon }) => {
+          const badge = role === 'admin' && label === 'Vérifications' && pendingT.length > 0 ? pendingT.length : null
+          return (
+            <Link
+              key={href + label}
+              href={href}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                isActive(href)
+                  ? 'bg-white/22 text-white shadow-sm'
+                  : 'text-white/60 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icon size={17} className="flex-shrink-0" />
+              <span className="flex-1">{label}</span>
+              {badge && (
+                <span className="w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold flex-shrink-0">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
+            </Link>
+          )
+        })}
       </nav>
 
       {/* RÉSUMÉ mini-stats */}
@@ -157,6 +181,7 @@ export default function DashboardSidebar() {
       {/* Logout */}
       <div className="flex-shrink-0 px-3 pt-3 pb-5 border-t border-white/10">
         <button
+          type="button"
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-white/55 hover:text-white hover:bg-white/10 transition-all"
         >

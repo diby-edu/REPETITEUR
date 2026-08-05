@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
-import { MessageCircle, Heart, Settings, Bell } from 'lucide-react'
+import { MessageCircle, Heart, Settings, Bell, Menu } from 'lucide-react'
 import DashboardSidebar from './DashboardSidebar'
 
 // Pages inject their action button here via useHeaderSlot()
@@ -36,6 +36,7 @@ export default function DashboardLayout({ children }) {
   const role   = currentUser?.role
   const userId = currentUser?.id
   const [slot, setSlot] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const ctx = useMemo(() => ({ setSlot }), [])
 
   useEffect(() => {
@@ -70,12 +71,31 @@ export default function DashboardLayout({ children }) {
   return (
     <HeaderCtx.Provider value={ctx}>
       <div className="flex h-screen overflow-hidden bg-surface">
-        <Suspense fallback={<div className="w-60 flex-shrink-0" style={{ background: 'linear-gradient(180deg,#1B4332 0%,#2D6A4F 100%)' }} />}>
-          <DashboardSidebar />
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <button
+            type="button"
+            aria-label="Fermer le menu"
+            className="fixed inset-0 z-40 bg-black/40 md:hidden w-full cursor-default"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <Suspense fallback={<div className="hidden md:block w-60 flex-shrink-0" style={{ background: 'linear-gradient(180deg,#1B4332 0%,#2D6A4F 100%)' }} />}>
+          <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         </Suspense>
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <header className="h-14 flex-shrink-0 flex items-center justify-between gap-3 px-6 border-b border-gray-100 bg-white">
-            <div className="flex-1 flex items-center">{slot}</div>
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <header className="h-14 flex-shrink-0 flex items-center justify-between gap-3 px-4 md:px-6 border-b border-gray-100 bg-white">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <button
+                type="button"
+                className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition-colors flex-shrink-0"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Ouvrir le menu"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="flex-1 min-w-0">{slot}</div>
+            </div>
             <div className="flex items-center gap-0.5">
               {icons.map(item => <TopIconBtn key={item.href + item.title} {...item} />)}
             </div>

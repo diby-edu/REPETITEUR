@@ -15,13 +15,17 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 const DAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', vendredi: 'Ven', samedi: 'Sam', dimanche: 'Dim' }
-const TIME_SLOTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00']
+// Même format que l'étape Expertise de l'inscription (RegisterTutorPage) —
+// doit rester identique pour que les disponibilités saisies à l'inscription
+// s'affichent correctement ici.
+const SLOTS = ['8h-10h', '10h-12h', '12h-14h', '14h-16h', '16h-18h', '18h-20h']
 
 const TABS_TUTOR = ['Profil', 'Documents', 'Disponibilités', 'Sécurité', 'Notifications']
 const TABS_OTHER = ['Profil', 'Sécurité', 'Notifications']
 const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Admin' }
 
-function DocUploadZone({ file, onFile, inputRef, label }) {
+function DocUploadZone({ file, existingPath, onFile, inputRef, label, existingLabel }) {
+  const done = !!file || !!existingPath
   return (
     <>
       <input
@@ -35,7 +39,7 @@ function DocUploadZone({ file, onFile, inputRef, label }) {
         type="button"
         onClick={() => inputRef.current?.click()}
         className={`w-full border-2 border-dashed rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-          file ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+          done ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
         }`}
       >
         {file ? (
@@ -43,6 +47,12 @@ function DocUploadZone({ file, onFile, inputRef, label }) {
             <CheckCircle size={20} className="text-green-500" />
             <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
             <span className="text-xs text-gray-400">Cliquer pour changer</span>
+          </>
+        ) : existingPath ? (
+          <>
+            <CheckCircle size={20} className="text-green-500" />
+            <span className="text-xs font-medium text-green-700 text-center">{existingLabel || 'Déjà soumis'}</span>
+            <span className="text-xs text-gray-400">Cliquer pour remplacer</span>
           </>
         ) : (
           <>
@@ -87,11 +97,13 @@ export default function SettingsPage() {
   const [docCniRecto, setDocCniRecto] = useState(null)
   const [docCniVerso, setDocCniVerso] = useState(null)
   const [docPassport, setDocPassport] = useState(null)
-  const [docDiplomas, setDocDiplomas] = useState([{ name: '', file: null }])
+  const [docDiplomas, setDocDiplomas] = useState(() => {
+    const existing = (existingDocs.diplomes || []).map(d => ({ name: d.name, path: d.path, file: null }))
+    return [...existing, { name: '', path: null, file: null }]
+  })
   const [docSelfieDataUrl, setDocSelfieDataUrl] = useState(null)
   const [docCameraActive, setDocCameraActive] = useState(false)
   const [docUploading, setDocUploading] = useState(false)
-  const [docDone, setDocDone] = useState(false)
   const [docError, setDocError] = useState('')
 
   const docVideoRef = useRef(null)
@@ -162,19 +174,29 @@ export default function SettingsPage() {
       else setDocError(`Erreur upload passeport : ${error.message}`)
     }
 
-    const existingDiplomas = documents.diplomes || []
-    const newDiplomas = []
+    // Diplômes : chaque ligne peut être un diplôme déjà soumis (renommé et/ou
+    // fichier remplacé) ou un nouveau diplôme. On reconstruit la liste complète
+    // plutôt que d'ajouter uniquement, pour que le renommage soit pris en compte.
+    const finalDiplomas = []
     for (let i = 0; i < docDiplomas.length; i++) {
       const d = docDiplomas[i]
-      if (!d.file || !d.name.trim()) continue
-      const ext = d.file.name.split('.').pop()
-      const path = `${userId}/diplome_${Date.now()}_${i}.${ext}`
-      const { error } = await supabase.storage.from('documents').upload(path, d.file, { upsert: true })
-      if (!error) { newDiplomas.push({ name: d.name.trim(), path }); hasNewContent = true }
+      if (!d.name.trim()) continue
+      if (d.file) {
+        const ext = d.file.name.split('.').pop()
+        const path = `${userId}/diplome_${Date.now()}_${i}.${ext}`
+        const { error } = await supabase.storage.from('documents').upload(path, d.file, { upsert: true })
+        if (!error) finalDiplomas.push({ name: d.name.trim(), path })
+        else setDocError(`Erreur upload diplôme : ${error.message}`)
+      } else if (d.path) {
+        finalDiplomas.push({ name: d.name.trim(), path: d.path })
+      }
     }
-    documents.diplomes = [...existingDiplomas, ...newDiplomas]
+    documents.diplomes = finalDiplomas
+    if (JSON.stringify(finalDiplomas) !== JSON.stringify(existingDocs.diplomes || [])) hasNewContent = true
 
-    if (docSelfieDataUrl) {
+    // Selfie : non modifiable une fois soumis (voir JSX — la caméra est
+    // masquée dans ce cas), on ne le retouche donc que pour un premier envoi.
+    if (!hasSelfie && docSelfieDataUrl) {
       try {
         const res = await fetch(docSelfieDataUrl)
         const blob = await res.blob()
@@ -185,7 +207,7 @@ export default function SettingsPage() {
 
     if (!hasNewContent) {
       setDocUploading(false)
-      setDocError('Aucun fichier sélectionné.')
+      setDocError('Aucune modification à enregistrer.')
       return
     }
 
@@ -198,11 +220,10 @@ export default function SettingsPage() {
 
     await refreshCurrentUser()
     setDocUploading(false)
-    setDocDone(true)
     setDocCniRecto(null); setDocCniVerso(null); setDocPassport(null)
-    setDocDiplomas([{ name: '', file: null }]); setDocSelfieDataUrl(null)
-    showToast('Documents soumis — en attente de vérification admin.')
-    setTimeout(() => setDocDone(false), 5000)
+    setDocDiplomas([...finalDiplomas.map(d => ({ name: d.name, path: d.path, file: null })), { name: '', path: null, file: null }])
+    setDocSelfieDataUrl(null)
+    showToast('Documents mis à jour — en attente de vérification admin.')
   }
 
   const toggleSlot = (day, time) => {
@@ -306,7 +327,7 @@ export default function SettingsPage() {
   }
 
   const docs = currentUser?.documents || {}
-  const hasId = !!(docs.cniRecto || docs.passport || docs.cni)
+  const hasId = !!((docs.cniRecto && docs.cniVerso) || docs.passport)
   const hasSelfie = !!docs.selfiePath
   const diplomaCount = docs.diplomes?.length || 0
 
@@ -499,17 +520,32 @@ export default function SettingsPage() {
                       </div>
                     ))}
                   </div>
-                  {docDone && (
+                  {currentUser.verificationStatus === 'pending' && (
+                    <div className="mt-3 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 text-sm text-orange-700">
+                      <Clock size={15} className="flex-shrink-0" />
+                      En attente de validation par l'équipe — vérification sous 24-48h.
+                    </div>
+                  )}
+                  {currentUser.verificationStatus === 'verified' && (
                     <div className="mt-3 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 text-sm text-green-700">
-                      <CheckCircle size={15} />
-                      Documents soumis — l'admin les vérifiera sous 24-48h.
+                      <CheckCircle size={15} className="flex-shrink-0" />
+                      Dossier validé — vous êtes visible dans les recherches.
+                    </div>
+                  )}
+                  {currentUser.verificationStatus === 'rejected' && (
+                    <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm text-red-700">
+                      <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                      <span>Dossier rejeté — {currentUser.rejectionReason || "vos documents n'ont pas pu être validés."}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Upload form */}
                 <div className="card space-y-5">
-                  <h2 className="font-semibold text-gray-900">Soumettre / Compléter vos documents</h2>
+                  <h2 className="font-semibold text-gray-900">Modifier vos documents</h2>
+                  <p className="text-xs text-gray-400 -mt-3">
+                    La pièce d'identité et les diplômes peuvent être remplacés ou renommés. Le selfie n'est pas modifiable une fois envoyé.
+                  </p>
 
                   {/* Pièce d'identité */}
                   <div>
@@ -532,17 +568,38 @@ export default function SettingsPage() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <p className="text-xs text-gray-500 mb-1.5">CNI Recto</p>
-                          <DocUploadZone file={docCniRecto} onFile={setDocCniRecto} inputRef={docCniRectoRef} label="Charger le recto" />
+                          <DocUploadZone
+                            file={docCniRecto}
+                            existingPath={existingDocs.cniRectoPath}
+                            onFile={setDocCniRecto}
+                            inputRef={docCniRectoRef}
+                            label="Charger le recto"
+                            existingLabel="CNI Recto déjà soumis"
+                          />
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 mb-1.5">CNI Verso</p>
-                          <DocUploadZone file={docCniVerso} onFile={setDocCniVerso} inputRef={docCniVersoRef} label="Charger le verso" />
+                          <DocUploadZone
+                            file={docCniVerso}
+                            existingPath={existingDocs.cniVersoPath}
+                            onFile={setDocCniVerso}
+                            inputRef={docCniVersoRef}
+                            label="Charger le verso"
+                            existingLabel="CNI Verso déjà soumis"
+                          />
                         </div>
                       </div>
                     ) : (
                       <div>
                         <p className="text-xs text-gray-500 mb-1.5">Page photo du passeport</p>
-                        <DocUploadZone file={docPassport} onFile={setDocPassport} inputRef={docPassportRef} label="Charger la page photo" />
+                        <DocUploadZone
+                          file={docPassport}
+                          existingPath={existingDocs.passportPath}
+                          onFile={setDocPassport}
+                          inputRef={docPassportRef}
+                          label="Charger la page photo"
+                          existingLabel="Passeport déjà soumis"
+                        />
                       </div>
                     )}
                   </div>
@@ -550,10 +607,10 @@ export default function SettingsPage() {
                   {/* Diplômes */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium text-gray-700">Diplômes à ajouter</p>
+                      <p className="text-sm font-medium text-gray-700">Diplômes</p>
                       <button
                         type="button"
-                        onClick={() => setDocDiplomas(d => [...d, { name: '', file: null }])}
+                        onClick={() => setDocDiplomas(d => [...d, { name: '', path: null, file: null }])}
                         className="text-xs text-primary flex items-center gap-1 hover:underline"
                       >
                         <Plus size={13} /> Ajouter
@@ -589,29 +646,38 @@ export default function SettingsPage() {
                                 type="button"
                                 onClick={() => document.getElementById(`doc-diploma-${i}`)?.click()}
                                 className={`w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all ${
-                                  d.file ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
+                                  d.file || d.path ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
                                 }`}
                               >
-                                {d.file ? <><CheckCircle size={14} className="text-green-500" /> {d.file.name}</> : <><Upload size={14} /> Fichier du diplôme</>}
+                                {d.file
+                                  ? <><CheckCircle size={14} className="text-green-500" /> {d.file.name}</>
+                                  : d.path
+                                    ? <><CheckCircle size={14} className="text-green-500" /> Déjà soumis — cliquer pour remplacer</>
+                                    : <><Upload size={14} /> Fichier du diplôme</>
+                                }
                               </button>
                             </>
                           )}
                         </div>
                       ))}
                     </div>
-                    {docs.diplomes?.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-2">{docs.diplomes.length} diplôme{docs.diplomes.length > 1 ? 's' : ''} déjà soumis — les nouveaux s'ajouteront.</p>
-                    )}
                   </div>
 
-                  {/* Selfie */}
+                  {/* Selfie — non modifiable une fois soumis */}
                   <div>
                     <p className="text-sm font-medium text-gray-700 mb-2">
                       Selfie avec pièce d'identité
-                      {hasSelfie && <span className="ml-2 text-xs text-green-600 font-normal">— déjà soumis</span>}
+                      {hasSelfie && <span className="ml-2 text-xs text-green-600 font-normal">— déjà soumis, non modifiable</span>}
                     </p>
                     <div className="bg-gray-50 rounded-xl p-4">
-                      {docSelfieDataUrl ? (
+                      {hasSelfie ? (
+                        <div className="flex flex-col items-center gap-2 py-2">
+                          <CheckCircle size={26} className="text-green-500" />
+                          <p className="text-xs text-gray-400 text-center max-w-xs">
+                            Votre selfie a déjà été envoyé et ne peut pas être remplacé depuis cette page.
+                          </p>
+                        </div>
+                      ) : docSelfieDataUrl ? (
                         <div className="flex flex-col items-center gap-3">
                           <img src={docSelfieDataUrl} alt="selfie" className="w-48 h-36 object-cover rounded-xl border border-green-300" />
                           <button type="button" onClick={retakeDocPhoto} className="text-xs text-primary flex items-center gap-1">
@@ -657,7 +723,7 @@ export default function SettingsPage() {
                   >
                     {docUploading
                       ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Envoi en cours…</>
-                      : <><Save size={16} /> Soumettre les documents</>
+                      : <><Save size={16} /> Enregistrer les modifications</>
                     }
                   </button>
                 </div>
@@ -677,7 +743,7 @@ export default function SettingsPage() {
                   <table className="min-w-full text-xs">
                     <thead>
                       <tr>
-                        <th className="pr-3 pb-2 text-left text-gray-400 font-medium w-14">Heure</th>
+                        <th className="pr-3 pb-2 text-left text-gray-400 font-medium w-16">Créneau</th>
                         {DAYS.map(d => (
                           <th key={d} className="pb-2 text-center text-gray-600 font-semibold px-1">
                             {DAY_LABELS[d]}
@@ -686,9 +752,9 @@ export default function SettingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {TIME_SLOTS.map(time => (
+                      {SLOTS.map(time => (
                         <tr key={time} className="border-t border-gray-50">
-                          <td className="pr-3 py-1 text-gray-400 font-mono">{time}</td>
+                          <td className="pr-3 py-1 text-gray-400 font-mono whitespace-nowrap">{time}</td>
                           {DAYS.map(day => {
                             const active = (availability[day] || []).includes(time)
                             return (

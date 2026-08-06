@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
 import { CITIES, LEVELS } from '../data/constants'
+import { getDocumentApprovalProgress } from '../utils/helpers'
 import Avatar from '../components/common/Avatar'
 import DashboardLayout from '../components/layout/DashboardLayout'
 import {
@@ -338,7 +339,7 @@ export default function SettingsPage() {
   const docs = currentUser?.documents || {}
   const hasId = !!((docs.cniRecto && docs.cniVerso) || docs.passport)
   const hasSelfie = !!docs.selfiePath
-  const diplomaCount = docs.diplomes?.length || 0
+  const docProgress = getDocumentApprovalProgress(docs)
 
   return (
     <DashboardLayout>
@@ -510,25 +511,55 @@ export default function SettingsPage() {
 
                 {/* Statut actuel */}
                 <div className="card">
-                  <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <h2 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
                     <FileText size={18} className="text-primary" />
                     Statut de votre dossier
                   </h2>
-                  <div className="space-y-2">
-                    {[
-                      { label: 'Pièce d\'identité', ok: hasId },
-                      { label: 'Selfie avec pièce', ok: hasSelfie },
-                      { label: `Diplôme${diplomaCount > 1 ? 's' : ''} (${diplomaCount} soumis)`, ok: diplomaCount > 0 },
-                    ].map(({ label, ok }) => (
-                      <div key={label} className="flex items-center gap-2 text-sm">
-                        {ok
-                          ? <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
-                          : <AlertCircle size={16} className="text-orange-400 flex-shrink-0" />
-                        }
-                        <span className={ok ? 'text-gray-700' : 'text-orange-700 font-medium'}>{label}</span>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Le dossier n'est validé à 100% que lorsque chaque document soumis est approuvé individuellement.
+                  </p>
+
+                  {docProgress.total > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-gray-600">Progression de l'approbation</span>
+                        <span className="text-xs font-bold text-gray-900 tabular-nums">{docProgress.approved}/{docProgress.total} · {docProgress.pct}%</span>
                       </div>
-                    ))}
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-500 ${docProgress.rejected > 0 ? 'bg-red-400' : 'bg-secondary'}`}
+                          style={{ width: `${docProgress.pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {docProgress.items.length === 0 && (
+                      <p className="text-sm text-orange-600 font-medium">Aucun document soumis pour le moment.</p>
+                    )}
+                    {docProgress.items.map(item => {
+                      const pill = {
+                        approved: { text: 'Approuvé', cls: 'bg-green-100 text-green-700', icon: CheckCircle, iconCls: 'text-green-500' },
+                        rejected: { text: 'Rejeté',   cls: 'bg-red-100 text-red-700',   icon: AlertCircle, iconCls: 'text-red-500' },
+                        pending:  { text: 'En attente', cls: 'bg-orange-100 text-orange-600', icon: Clock, iconCls: 'text-orange-400' },
+                      }[item.status]
+                      const Icon = pill.icon
+                      return (
+                        <div key={item.key} className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <Icon size={16} className={`flex-shrink-0 ${pill.iconCls}`} />
+                            <span className="text-gray-700 flex-1">{item.label}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${pill.cls}`}>{pill.text}</span>
+                          </div>
+                          {item.status === 'rejected' && item.reason && (
+                            <p className="text-xs text-red-600 ml-6 mt-0.5">Motif : {item.reason}</p>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
+
                   {currentUser.verificationStatus === 'pending' && (
                     <div className="mt-3 flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2.5 text-sm text-orange-700">
                       <Clock size={15} className="flex-shrink-0" />
@@ -538,7 +569,7 @@ export default function SettingsPage() {
                   {currentUser.verificationStatus === 'verified' && (
                     <div className="mt-3 flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2.5 text-sm text-green-700">
                       <CheckCircle size={15} className="flex-shrink-0" />
-                      Dossier validé — vous êtes visible dans les recherches.
+                      Dossier validé à 100% — vous êtes visible dans les recherches.
                     </div>
                   )}
                   {currentUser.verificationStatus === 'rejected' && (

@@ -148,3 +148,34 @@ export function truncate(text, maxLength = 120) {
   if (!text || text.length <= maxLength) return text
   return text.substring(0, maxLength).trimEnd() + '...'
 }
+
+// Décompose le dossier d'un répétiteur en items individuellement révisables
+// (pièce d'identité, selfie, chaque diplôme) pour l'affichage du statut
+// détaillé et de la barre de progression d'approbation.
+export function getDocumentApprovalProgress(documents) {
+  const docs = documents || {}
+  const isPassport = docs.idType === 'passport'
+  const idSubmitted = isPassport ? !!docs.passport : !!(docs.cniRecto && docs.cniVerso)
+  const diplomas = docs.diplomes || []
+
+  const items = []
+  if (idSubmitted) {
+    items.push({
+      key: 'id', label: isPassport ? 'Passeport' : 'CNI (recto + verso)',
+      status: docs.idReview?.status || 'pending', reason: docs.idReview?.reason,
+    })
+  }
+  if (docs.selfiePath) {
+    items.push({ key: 'selfie', label: 'Selfie avec pièce', status: docs.selfieReview?.status || 'pending', reason: docs.selfieReview?.reason })
+  }
+  diplomas.forEach((d, i) => {
+    if (d.path) items.push({ key: `diploma-${i}`, label: d.name || `Diplôme ${i + 1}`, status: d.review?.status || 'pending', reason: d.review?.reason })
+  })
+
+  const total = items.length
+  const approved = items.filter(i => i.status === 'approved').length
+  const rejected = items.filter(i => i.status === 'rejected').length
+  const pct = total > 0 ? Math.round((approved / total) * 100) : 0
+
+  return { items, total, approved, rejected, pct }
+}

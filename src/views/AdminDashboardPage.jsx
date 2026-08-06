@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
   BarChart3, FileText, ExternalLink, Wallet, Star,
 } from 'lucide-react'
-import { formatDateShort, formatFCFA } from '../utils/helpers'
+import { formatDateShort, formatFCFA, getDocumentApprovalProgress } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats', 'Paiements', 'Avis']
@@ -79,6 +79,66 @@ function VerticalBars({ bars, height = 128 }) {
           <span className="text-[10px] text-gray-500 text-center leading-tight">{bar.label}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+const DOC_REVIEW_PILL = {
+  approved: { text: 'Approuvé', cls: 'bg-green-100 text-green-700' },
+  rejected: { text: 'Rejeté',   cls: 'bg-red-100 text-red-700' },
+  pending:  { text: 'En attente', cls: 'bg-gray-100 text-gray-500' },
+}
+
+function DocReviewRow({ label, submitted, reviewStatus, reviewReason, onView, onViewSecondary, onApprove, onReject }) {
+  const pill = DOC_REVIEW_PILL[reviewStatus] || DOC_REVIEW_PILL.pending
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2 py-2.5 px-3 rounded-xl bg-gray-50">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-sm font-medium ${submitted ? 'text-gray-800' : 'text-orange-500 italic'}`}>{label}</span>
+          {submitted
+            ? <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pill.cls}`}>{pill.text}</span>
+            : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">Non soumis</span>
+          }
+        </div>
+        {reviewStatus === 'rejected' && reviewReason && (
+          <p className="text-xs text-red-600 mt-0.5">Motif : {reviewReason}</p>
+        )}
+        {submitted && (onView || onViewSecondary) && (
+          <div className="flex items-center gap-3 mt-1">
+            {onView && (
+              <button onClick={onView} className="text-xs text-primary hover:underline flex items-center gap-1">
+                <ExternalLink size={11} /> Voir
+              </button>
+            )}
+            {onViewSecondary && (
+              <button onClick={onViewSecondary} className="text-xs text-primary hover:underline flex items-center gap-1">
+                <ExternalLink size={11} /> Voir verso
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {submitted && (
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={onReject}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+              reviewStatus === 'rejected' ? 'border-red-300 bg-red-50 text-red-600' : 'border-gray-200 text-gray-500 hover:border-red-200 hover:text-red-600'
+            }`}
+          >
+            Rejeter
+          </button>
+          <button
+            onClick={onApprove}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              reviewStatus === 'approved' ? 'bg-secondary text-white' : 'bg-secondary/10 text-secondary hover:bg-secondary hover:text-white'
+            }`}
+          >
+            Approuver
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -152,7 +212,7 @@ function SparklineChart({ data, height = 80 }) {
 }
 
 export default function AdminDashboardPage() {
-  const { tutors, validateTutor, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
+  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -165,6 +225,7 @@ export default function AdminDashboardPage() {
   }
   const [rejectModal, setRejectModal]       = useState(null)
   const [rejectReason, setRejectReason]     = useState('')
+  const [approveModal, setApproveModal]     = useState(null)
   const [userFilter, setUserFilter]         = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')   // 'all' | 'tutor' | 'parent'
   const [userStatusFilter, setUserStatusFilter] = useState('all') // 'all' | 'verified' | 'pending' | 'rejected'
@@ -419,11 +480,16 @@ export default function AdminDashboardPage() {
   const standardSubs = tutors.filter(t => t.subscription?.plan === 'standard' && t.subscription?.status === 'active')
   const activeSubscriptions = tutors.filter(t => t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
 
-  const handleValidate = (tutorId) => validateTutor(tutorId, 'verified')
-  const handleReject   = (tutor)   => { setRejectModal(tutor); setRejectReason('') }
+  // Revue individuelle par document — docKey: 'id' | 'selfie' | 'diploma-<index>'
+  const openReviewApprove = (tutor, docKey, label) => setApproveModal({ tutor, docKey, label })
+  const openReviewReject  = (tutor, docKey, label) => { setRejectModal({ tutor, docKey, label }); setRejectReason('') }
+  const confirmValidate = () => {
+    reviewDocument(approveModal.tutor.id, approveModal.docKey, 'approved')
+    setApproveModal(null)
+  }
   const confirmReject  = () => {
     if (!rejectReason.trim()) { showToast('Veuillez saisir un motif de rejet.', 'error'); return }
-    validateTutor(rejectModal.id, 'rejected', rejectReason)
+    reviewDocument(rejectModal.tutor.id, rejectModal.docKey, 'rejected', rejectReason)
     setRejectModal(null); setRejectReason('')
   }
 
@@ -460,14 +526,14 @@ export default function AdminDashboardPage() {
                 <XCircle size={20} className="text-red-500" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Rejeter le dossier</h3>
-                <p className="text-sm text-gray-500">{rejectModal.firstName} {rejectModal.lastName}</p>
+                <h3 className="font-semibold text-gray-900">Rejeter — {rejectModal.label}</h3>
+                <p className="text-sm text-gray-500">{rejectModal.tutor.firstName} {rejectModal.tutor.lastName}</p>
               </div>
             </div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Motif du rejet *</label>
             <textarea
               className="input-field resize-none h-28"
-              placeholder="Expliquez pourquoi le dossier est rejeté..."
+              placeholder="Expliquez pourquoi ce document est rejeté..."
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
             />
@@ -475,6 +541,32 @@ export default function AdminDashboardPage() {
               <button onClick={() => setRejectModal(null)} className="btn-outline flex-1">Annuler</button>
               <button onClick={confirmReject} className="flex-1 bg-red-500 text-white font-semibold px-6 py-3 rounded-full hover:bg-red-600 transition-colors">
                 Confirmer le rejet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve modal */}
+      {approveModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                <CheckCircle size={20} className="text-secondary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Approuver — {approveModal.label}</h3>
+                <p className="text-sm text-gray-500">{approveModal.tutor.firstName} {approveModal.tutor.lastName}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600">
+              Confirmez-vous l'approbation de ce document ? Le répétiteur ne devient visible dans les recherches qu'une fois pièce d'identité, selfie et au moins un diplôme approuvés.
+            </p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setApproveModal(null)} className="btn-outline flex-1">Annuler</button>
+              <button onClick={confirmValidate} className="flex-1 bg-secondary text-white font-semibold px-6 py-3 rounded-full hover:bg-secondary-600 transition-colors">
+                Confirmer la validation
               </button>
             </div>
           </div>
@@ -730,109 +822,91 @@ export default function AdminDashboardPage() {
                 <p className="text-gray-400 text-sm">Tous les dossiers ont été traités !</p>
               </div>
             )}
-            {pending.map(tutor => (
-              <div key={tutor.id} className="card">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <Avatar user={tutor} size="lg" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-gray-900">{tutor.firstName} {tutor.lastName}</h4>
-                      <StatusBadge status="pending" />
+            {pending.map(tutor => {
+              const docs = tutor.documents || {}
+              const isPassport = docs.idType === 'passport'
+              const idSubmitted = isPassport ? !!docs.passport : !!(docs.cniRecto && docs.cniVerso)
+              const idLabel = isPassport ? 'Passeport' : 'CNI (recto + verso)'
+              const diplomas = docs.diplomes || []
+              const progress = getDocumentApprovalProgress(docs)
+              return (
+                <div key={tutor.id} className="card">
+                  <div className="flex items-center gap-4 mb-4">
+                    <Avatar user={tutor} size="lg" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-gray-900">{tutor.firstName} {tutor.lastName}</h4>
+                        <StatusBadge status="pending" />
+                      </div>
+                      <p className="text-sm text-gray-500">{tutor.email} — {tutor.city}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Matières : {tutor.subjects.join(', ')} | Niveaux : {tutor.levels.join(', ')}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">Inscrit le {formatDateShort(tutor.joinDate)}</p>
                     </div>
-                    <p className="text-sm text-gray-500">{tutor.email} — {tutor.city}</p>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Matières : {tutor.subjects.join(', ')} | Niveaux : {tutor.levels.join(', ')}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">Inscrit le {formatDateShort(tutor.joinDate)}</p>
+                    {progress.total > 0 && (
+                      <div className="flex-shrink-0 w-32">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">Approbation</span>
+                          <span className="text-[10px] font-bold text-gray-700 tabular-nums">{progress.pct}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-500 ${progress.rejected > 0 ? 'bg-red-400' : 'bg-secondary'}`}
+                            style={{ width: `${progress.pct}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{progress.approved}/{progress.total} approuvés</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-shrink-0 min-w-[220px]">
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-gray-600 mb-2">Documents soumis :</p>
-                      {!tutor.documents?.idType && !tutor.documents?.cni && !tutor.documents?.cniRecto && !tutor.documents?.passport && (
-                        <p className="text-xs text-orange-500 italic">Aucun document soumis.</p>
-                      )}
-                      {tutor.documents?.idType === 'cni' && (
-                        <>
-                          <div className="flex items-center justify-between gap-2 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-2 h-2 rounded-full ${tutor.documents?.cniRecto ? 'bg-green-400' : 'bg-red-400'}`} />
-                              <span className="text-gray-600">CNI — Recto</span>
-                            </div>
-                            {tutor.documents?.cniRectoPath && (
-                              <button onClick={() => viewDocument(tutor.documents.cniRectoPath)} className="flex items-center gap-1 text-primary hover:underline">
-                                <ExternalLink size={11} /> Voir
-                              </button>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between gap-2 text-xs">
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-2 h-2 rounded-full ${tutor.documents?.cniVerso ? 'bg-green-400' : 'bg-red-400'}`} />
-                              <span className="text-gray-600">CNI — Verso</span>
-                            </div>
-                            {tutor.documents?.cniVersoPath && (
-                              <button onClick={() => viewDocument(tutor.documents.cniVersoPath)} className="flex items-center gap-1 text-primary hover:underline">
-                                <ExternalLink size={11} /> Voir
-                              </button>
-                            )}
-                          </div>
-                        </>
-                      )}
-                      {tutor.documents?.idType === 'passport' && (
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <div className={`w-2 h-2 rounded-full ${tutor.documents?.passport ? 'bg-green-400' : 'bg-red-400'}`} />
-                            <span className="text-gray-600">Passeport</span>
-                          </div>
-                          {tutor.documents?.passportPath && (
-                            <button onClick={() => viewDocument(tutor.documents.passportPath)} className="flex items-center gap-1 text-primary hover:underline">
-                              <ExternalLink size={11} /> Voir
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {!tutor.documents?.idType && tutor.documents?.cni && (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <div className="w-2 h-2 rounded-full bg-green-400" />
-                          <span className="text-gray-600">CNI soumise</span>
-                        </div>
-                      )}
-                      {tutor.documents?.selfiePath && (
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-green-400" />
-                            <span className="text-gray-600">Selfie avec pièce</span>
-                          </div>
-                          <button onClick={() => viewDocument(tutor.documents.selfiePath)} className="flex items-center gap-1 text-primary hover:underline">
-                            <ExternalLink size={11} /> Voir
-                          </button>
-                        </div>
-                      )}
-                      {(tutor.documents?.diplomes || []).map((d, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2 text-xs">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                            <span className="text-gray-600 truncate">{d.name || d}</span>
-                          </div>
-                          {d.path && (
-                            <button onClick={() => viewDocument(d.path)} className="flex items-center gap-1 text-primary hover:underline flex-shrink-0">
-                              <ExternalLink size={11} /> Voir
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <button onClick={() => handleReject(tutor)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors">
-                        <XCircle size={15} /> Rejeter
-                      </button>
-                      <button onClick={() => handleValidate(tutor.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary text-white text-sm font-semibold hover:bg-secondary-600 transition-colors">
-                        <CheckCircle size={15} /> Valider
-                      </button>
-                    </div>
+
+                  <div className="space-y-2 pt-3 border-t border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Documents — à approuver ou rejeter individuellement</p>
+
+                    <DocReviewRow
+                      label={idLabel}
+                      submitted={idSubmitted}
+                      reviewStatus={docs.idReview?.status || 'pending'}
+                      reviewReason={docs.idReview?.reason}
+                      onView={idSubmitted ? () => viewDocument(isPassport ? docs.passportPath : docs.cniRectoPath) : null}
+                      onViewSecondary={!isPassport && docs.cniVersoPath ? () => viewDocument(docs.cniVersoPath) : null}
+                      onApprove={() => openReviewApprove(tutor, 'id', idLabel)}
+                      onReject={() => openReviewReject(tutor, 'id', idLabel)}
+                    />
+
+                    <DocReviewRow
+                      label="Selfie avec pièce"
+                      submitted={!!docs.selfiePath}
+                      reviewStatus={docs.selfieReview?.status || 'pending'}
+                      reviewReason={docs.selfieReview?.reason}
+                      onView={docs.selfiePath ? () => viewDocument(docs.selfiePath) : null}
+                      onApprove={() => openReviewApprove(tutor, 'selfie', 'Selfie')}
+                      onReject={() => openReviewReject(tutor, 'selfie', 'Selfie')}
+                    />
+
+                    {diplomas.length === 0 && (
+                      <p className="text-xs text-orange-500 italic py-1 px-3">Aucun diplôme soumis.</p>
+                    )}
+                    {diplomas.map((d, i) => {
+                      const label = d.name || `Diplôme ${i + 1}`
+                      return (
+                        <DocReviewRow
+                          key={i}
+                          label={label}
+                          submitted={!!d.path}
+                          reviewStatus={d.review?.status || 'pending'}
+                          reviewReason={d.review?.reason}
+                          onView={d.path ? () => viewDocument(d.path) : null}
+                          onApprove={() => openReviewApprove(tutor, `diploma-${i}`, label)}
+                          onReject={() => openReviewReject(tutor, `diploma-${i}`, label)}
+                        />
+                      )
+                    })}
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {(verified.length > 0 || rejected.length > 0) && (
               <>
                 <h3 className="font-semibold text-gray-700 mt-6">Dossiers traités récemment</h3>

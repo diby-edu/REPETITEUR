@@ -226,6 +226,69 @@ export function AppProvider({ children }) {
     showToast(verified ? 'Répétiteur validé !' : 'Dossier rejeté.')
   }, [tutors, showToast])
 
+  // Statut global dérivé des décisions individuelles par document —
+  // le dossier n'est "vérifié" que si TOUS les documents soumis (pièce
+  // d'identité, selfie, chaque diplôme) sont individuellement approuvés.
+  // Un seul document rejeté suffit à rejeter tout le dossier.
+  const deriveDocumentsStatus = (documents) => {
+    const idStatus = documents.idReview?.status || 'pending'
+    const selfieStatus = documents.selfieReview?.status || 'pending'
+    const diplomas = documents.diplomes || []
+    const diplomaStatuses = diplomas.map(d => d.review?.status || 'pending')
+    const allStatuses = [idStatus, selfieStatus, ...diplomaStatuses]
+
+    if (allStatuses.some(s => s === 'rejected')) return 'rejected'
+    if (allStatuses.every(s => s === 'approved') && diplomas.length > 0) return 'verified'
+    return 'pending'
+  }
+
+  // docKey: 'id' | 'selfie' | 'diploma-<index>'
+  const reviewDocument = useCallback(async (tutorId, docKey, decision, reason = '') => {
+    const tutor = tutors.find(t => t.id === tutorId)
+    if (!tutor) return
+    const documents = { ...(tutor.documents || {}) }
+    const review = { status: decision, reason: decision === 'rejected' ? reason : '' }
+
+    if (docKey === 'id') {
+      documents.idReview = review
+    } else if (docKey === 'selfie') {
+      documents.selfieReview = review
+    } else if (docKey.startsWith('diploma-')) {
+      const idx = parseInt(docKey.split('-')[1], 10)
+      const diplomes = [...(documents.diplomes || [])]
+      if (!diplomes[idx]) return
+      diplomes[idx] = { ...diplomes[idx], review }
+      documents.diplomes = diplomes
+    } else {
+      return
+    }
+
+    const overallStatus = deriveDocumentsStatus(documents)
+    const reasons = []
+    if (documents.idReview?.status === 'rejected') reasons.push(`Pièce d'identité : ${documents.idReview.reason}`)
+    if (documents.selfieReview?.status === 'rejected') reasons.push(`Selfie : ${documents.selfieReview.reason}`)
+    ;(documents.diplomes || []).forEach(d => {
+      if (d.review?.status === 'rejected') reasons.push(`Diplôme "${d.name}" : ${d.review.reason}`)
+    })
+    const overallReason = reasons.join(' — ')
+    const isActive = overallStatus === 'verified' && tutor.subscription?.status === 'active' && tutor.subscription?.plan !== 'gratuit'
+
+    const { error } = await supabase.from('tutors').update({
+      documents,
+      verification_status: overallStatus,
+      rejection_reason: overallStatus === 'rejected' ? overallReason : null,
+      is_active: isActive,
+    }).eq('id', tutorId)
+
+    if (error) { showToast('Erreur lors de la mise à jour.', 'error'); return }
+    setTutors(prev => prev.map(t => t.id !== tutorId ? t : {
+      ...t, documents, verificationStatus: overallStatus,
+      rejectionReason: overallStatus === 'rejected' ? overallReason : undefined,
+      isActive,
+    }))
+    showToast(decision === 'approved' ? 'Document approuvé.' : 'Document rejeté.')
+  }, [tutors, showToast])
+
   const updateTutorSubscription = useCallback(async (tutorId, plan) => {
     const endDate = new Date()
     endDate.setMonth(endDate.getMonth() + 1)
@@ -893,7 +956,7 @@ export function AppProvider({ children }) {
 
       // Tuteurs
       getTutor, getActiveTutors, getPendingTutors, reloadTutors,
-      validateTutor, updateTutorSubscription, suspendTutor, unsuspendTutor, updateTutorAvailability,
+      validateTutor, reviewDocument, updateTutorSubscription, suspendTutor, unsuspendTutor, updateTutorAvailability,
 
       // Conversations & messages
       getConversation, getUserConversations, getOrCreateConversation,

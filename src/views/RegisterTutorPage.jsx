@@ -280,7 +280,6 @@ export default function RegisterTutorPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
       setCameraActive(true)
     } catch {
       setError('Impossible d\'activer la caméra. Vérifiez les autorisations.')
@@ -318,6 +317,17 @@ export default function RegisterTutorPage() {
   useEffect(() => {
     if (step !== 5 && cameraActive) stopCamera()
   }, [step, cameraActive, stopCamera])
+
+  // Le <video> n'existe dans le DOM qu'une fois cameraActive=true (rendu
+  // conditionnel) — assigner srcObject dans startCamera() est donc trop tôt
+  // (le ref est encore null) et laisse l'écran noir. On l'attache ici, une
+  // fois le composant vidéo effectivement monté.
+  useEffect(() => {
+    if (cameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play?.().catch(() => {})
+    }
+  }, [cameraActive])
 
   // Primaire uniquement = polyvalent, pas de sélection de matières
   const isPrimaireOnly = form.levels.length === 1 && form.levels[0] === 'Primaire'

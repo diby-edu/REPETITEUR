@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
 import { supabase } from '../lib/supabase'
@@ -117,12 +117,21 @@ export default function SettingsPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
       docStreamRef.current = stream
-      if (docVideoRef.current) docVideoRef.current.srcObject = stream
       setDocCameraActive(true)
     } catch {
       showToast('Impossible d\'activer la caméra. Vérifiez les autorisations.', 'error')
     }
   }
+
+  // Le <video> n'existe dans le DOM qu'une fois docCameraActive=true (rendu
+  // conditionnel) — attacher srcObject dans startDocCamera() est trop tôt
+  // (ref encore null), d'où l'écran noir. On l'attache une fois monté.
+  useEffect(() => {
+    if (docCameraActive && docVideoRef.current && docStreamRef.current) {
+      docVideoRef.current.srcObject = docStreamRef.current
+      docVideoRef.current.play?.().catch(() => {})
+    }
+  }, [docCameraActive])
 
   const captureDocPhoto = () => {
     const canvas = docCanvasRef.current

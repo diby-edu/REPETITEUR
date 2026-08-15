@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { SUBJECTS, LEVELS } from '../data/constants'
 import CityCombobox from '../components/common/CityCombobox'
-import { CheckCircle, ChevronLeft, Mail, Shield } from 'lucide-react'
+import { CheckCircle, ChevronLeft, Mail, Shield, Eye, EyeOff } from 'lucide-react'
 
 const steps = ['Informations personnelles', 'Préférences', 'Confirmation']
 
@@ -15,12 +15,15 @@ const steps = ['Informations personnelles', 'Préférences', 'Confirmation']
 function OtpInput({ value, onChange }) {
   const refs = useRef([])
   const len = 8
-  const chars = value.padEnd(len, ' ').split('').slice(0, len)
+  // Cases vides = chaîne vide (pas un espace) : avec maxLength=1, un espace
+  // pré-rempli est déjà "1 caractère" pour le champ, ce qui empêche la
+  // saisie native au clavier (seul le collage fonctionnait).
+  const chars = value.split('').concat(Array(len).fill('')).slice(0, len)
 
   const update = (i, char) => {
     const next = [...chars]
     next[i] = char
-    onChange(next.join('').replace(/\s+/g, ''))
+    onChange(next.join(''))
   }
 
   return (
@@ -74,10 +77,12 @@ export default function RegisterParentPage() {
   const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     city: '', childLevels: [], searchedSubjects: [],
-    openToContact: true, password: '',
+    openToContact: true, password: '', confirmPassword: '',
   })
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
@@ -282,12 +287,43 @@ export default function RegisterParentPage() {
                 <CityCombobox value={form.city} onChange={city => set('city', city)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe *</label>
-                <input type="password" className="input-field" value={form.password} onChange={e => set('password', e.target.value)} placeholder="••••••••" />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mot de passe * <span className="text-gray-400 font-normal">(8 caractères min.)</span></label>
+                <div className="relative">
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    className="input-field pr-10"
+                    value={form.password}
+                    onChange={e => set('password', e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                  <button type="button" onClick={() => setShowPwd(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmer le mot de passe *</label>
+                <div className="relative">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    className="input-field pr-10"
+                    value={form.confirmPassword}
+                    onChange={e => set('confirmPassword', e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                  />
+                  <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {form.confirmPassword && form.password !== form.confirmPassword && (
+                  <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas.</p>
+                )}
               </div>
               <button
                 onClick={() => setStep(1)}
-                disabled={!form.firstName || !form.lastName || !form.email || !form.city}
+                disabled={!form.firstName || !form.lastName || !form.email || !form.city || form.password.length < 8 || form.password !== form.confirmPassword}
                 className="btn-secondary w-full disabled:opacity-50"
               >
                 Continuer

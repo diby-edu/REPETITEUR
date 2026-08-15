@@ -85,12 +85,15 @@ async function uploadDoc(userId, file, filename) {
 function OtpInput({ value, onChange }) {
   const refs = useRef([])
   const len = 8
-  const chars = value.padEnd(len, ' ').split('').slice(0, len)
+  // Cases vides = chaîne vide (pas un espace) : avec maxLength=1, un espace
+  // pré-rempli est déjà "1 caractère" pour le champ, ce qui empêche la
+  // saisie native au clavier (seul le collage fonctionnait).
+  const chars = value.split('').concat(Array(len).fill('')).slice(0, len)
 
   const update = (i, char) => {
     const next = [...chars]
     next[i] = char
-    onChange(next.join('').replace(/\s+/g, ''))
+    onChange(next.join(''))
   }
 
   return (

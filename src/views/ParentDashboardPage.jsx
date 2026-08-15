@@ -302,6 +302,72 @@ export default function ParentDashboardPage() {
           ))}
         </div>
 
+        {/* Répétiteurs disponibles — remonté en haut pour la visibilité */}
+        {matchingTutors.length > 0 && (
+          <div className="card mb-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">🎯 Répétiteurs disponibles — {parent.city}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {matchingTutors.length} répétiteur{matchingTutors.length > 1 ? 's' : ''} · filtrés par matière
+                  {favoriteTutors.length > 0 && ` · ★ favoris en tête`}
+                </p>
+              </div>
+              <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                ...matchingTutors.filter(t => favoriteIds.has(t.id)),
+                ...matchingTutors.filter(t => !favoriteIds.has(t.id)),
+              ].slice(0, 6).map(t => {
+                const isFav = favoriteIds.has(t.id)
+                return (
+                  <div key={t.id} className={`border rounded-xl p-4 flex flex-col gap-3 hover:shadow-sm transition-shadow ${isFav ? 'border-accent/40 bg-accent/5' : 'border-gray-100'}`}>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                        style={{ backgroundColor: t.avatarColor || '#E87722' }}
+                      >
+                        {t.firstName?.[0]}{t.lastName?.[0]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-900 text-sm leading-tight flex items-center gap-1.5">
+                          {t.firstName} {t.lastName}
+                          {isFav && <span className="text-accent text-base leading-none">★</span>}
+                        </p>
+                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                          <MapPin size={10} /> {t.city}
+                          {t.rating > 0 && <span className="ml-1 text-accent font-semibold">★ {t.rating?.toFixed(1)}</span>}
+                        </p>
+                      </div>
+                    </div>
+                    {t.subjects?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {t.subjects.slice(0, 3).map(s => (
+                          <span key={s} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
+                        ))}
+                        {t.subjects.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>}
+                      </div>
+                    )}
+                    {t.monthlyRate > 0 && <p className="text-sm font-black text-primary">{formatFCFA(t.monthlyRate)} / mois</p>}
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => handleContactTutor(t.id)}
+                        disabled={contactingId === t.id}
+                        className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                      >
+                        {contactingId === t.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={12} />}
+                        Contacter
+                      </button>
+                      <Link href={`/repetiteur/${t.id}`} className="btn-outline text-xs py-2 px-3 text-center">Profil</Link>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Séances à confirmer — prioritaire */}
         {sessionsToReport.length > 0 && (
           <div className="card mb-5 border-orange-200 bg-orange-50/30">
@@ -492,72 +558,6 @@ export default function ParentDashboardPage() {
             </div>
           )}
         </div>
-
-        {/* Répétiteurs disponibles — en bas si contrats actifs, en haut sinon (géré par l'ordre de rendu) */}
-        {matchingTutors.length > 0 && (
-          <div className="card mt-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-sm font-bold text-gray-900">🎯 Répétiteurs disponibles — {parent.city}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {matchingTutors.length} répétiteur{matchingTutors.length > 1 ? 's' : ''} · filtrés par matière
-                  {favoriteTutors.length > 0 && ` · ★ favoris en tête`}
-                </p>
-              </div>
-              <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
-            </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[
-                ...matchingTutors.filter(t => favoriteIds.has(t.id)),
-                ...matchingTutors.filter(t => !favoriteIds.has(t.id)),
-              ].slice(0, 6).map(t => {
-                const isFav = favoriteIds.has(t.id)
-                return (
-                  <div key={t.id} className={`border rounded-xl p-4 flex flex-col gap-3 hover:shadow-sm transition-shadow ${isFav ? 'border-accent/40 bg-accent/5' : 'border-gray-100'}`}>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                        style={{ backgroundColor: t.avatarColor || '#E87722' }}
-                      >
-                        {t.firstName?.[0]}{t.lastName?.[0]}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-gray-900 text-sm leading-tight flex items-center gap-1.5">
-                          {t.firstName} {t.lastName}
-                          {isFav && <span className="text-accent text-base leading-none">★</span>}
-                        </p>
-                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                          <MapPin size={10} /> {t.city}
-                          {t.rating > 0 && <span className="ml-1 text-accent font-semibold">★ {t.rating?.toFixed(1)}</span>}
-                        </p>
-                      </div>
-                    </div>
-                    {t.subjects?.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {t.subjects.slice(0, 3).map(s => (
-                          <span key={s} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${parent.subjectsNeeded?.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}`}>{s}</span>
-                        ))}
-                        {t.subjects.length > 3 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">+{t.subjects.length - 3}</span>}
-                      </div>
-                    )}
-                    {t.monthlyRate > 0 && <p className="text-sm font-black text-primary">{formatFCFA(t.monthlyRate)} / mois</p>}
-                    <div className="flex gap-2 mt-auto">
-                      <button
-                        onClick={() => handleContactTutor(t.id)}
-                        disabled={contactingId === t.id}
-                        className="btn-primary text-xs py-2 flex-1 flex items-center justify-center gap-1.5 disabled:opacity-60"
-                      >
-                        {contactingId === t.id ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={12} />}
-                        Contacter
-                      </button>
-                      <Link href={`/repetiteur/${t.id}`} className="btn-outline text-xs py-2 px-3 text-center">Profil</Link>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
 
         {/* CTA vide */}
         {activeEngagements.length === 0 && pendingEngagements.length === 0 && conversations.length === 0 && (

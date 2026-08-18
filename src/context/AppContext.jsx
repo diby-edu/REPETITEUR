@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { filterPhoneAndEmail } from '../utils/helpers'
+import { deriveDocumentsStatus, buildRejectionReason, computeIsActive } from '../utils/verification'
 
 const AppContext = createContext(null)
 
@@ -226,22 +227,6 @@ export function AppProvider({ children }) {
     showToast(verified ? 'Répétiteur validé !' : 'Dossier rejeté.')
   }, [tutors, showToast])
 
-  // Statut global dérivé des décisions individuelles par document —
-  // le dossier n'est "vérifié" que si TOUS les documents soumis (pièce
-  // d'identité, selfie, chaque diplôme) sont individuellement approuvés.
-  // Un seul document rejeté suffit à rejeter tout le dossier.
-  const deriveDocumentsStatus = (documents) => {
-    const idStatus = documents.idReview?.status || 'pending'
-    const selfieStatus = documents.selfieReview?.status || 'pending'
-    const diplomas = documents.diplomes || []
-    const diplomaStatuses = diplomas.map(d => d.review?.status || 'pending')
-    const allStatuses = [idStatus, selfieStatus, ...diplomaStatuses]
-
-    if (allStatuses.some(s => s === 'rejected')) return 'rejected'
-    if (allStatuses.every(s => s === 'approved') && diplomas.length > 0) return 'verified'
-    return 'pending'
-  }
-
   // docKey: 'id' | 'selfie' | 'diploma-<index>'
   const reviewDocument = useCallback(async (tutorId, docKey, decision, reason = '') => {
     const tutor = tutors.find(t => t.id === tutorId)
@@ -264,14 +249,8 @@ export function AppProvider({ children }) {
     }
 
     const overallStatus = deriveDocumentsStatus(documents)
-    const reasons = []
-    if (documents.idReview?.status === 'rejected') reasons.push(`Pièce d'identité : ${documents.idReview.reason}`)
-    if (documents.selfieReview?.status === 'rejected') reasons.push(`Selfie : ${documents.selfieReview.reason}`)
-    ;(documents.diplomes || []).forEach(d => {
-      if (d.review?.status === 'rejected') reasons.push(`Diplôme "${d.name}" : ${d.review.reason}`)
-    })
-    const overallReason = reasons.join(' — ')
-    const isActive = overallStatus === 'verified' && tutor.subscription?.status === 'active' && tutor.subscription?.plan !== 'gratuit'
+    const overallReason = buildRejectionReason(documents)
+    const isActive = computeIsActive(overallStatus, tutor.subscription)
 
     const { error } = await supabase.from('tutors').update({
       documents,

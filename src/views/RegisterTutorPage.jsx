@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { SUBJECTS, LEVELS, QUARTIERS_BY_CITY } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
 import CityCombobox from '../components/common/CityCombobox'
+import OtpInput from '../components/common/OtpInput'
 import {
   CheckCircle, ChevronLeft, Upload, Clock, Home, Building2,
   Users, Wifi, FileText, Plus, Camera, RefreshCw,
@@ -80,58 +81,6 @@ async function uploadDoc(userId, file, filename) {
   const path = `${userId}/${filename}.${ext}`
   const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true })
   return error ? null : path
-}
-
-function OtpInput({ value, onChange }) {
-  const refs = useRef([])
-  const len = 8
-  // Cases vides = chaîne vide (pas un espace) : avec maxLength=1, un espace
-  // pré-rempli est déjà "1 caractère" pour le champ, ce qui empêche la
-  // saisie native au clavier (seul le collage fonctionnait).
-  const chars = value.split('').concat(Array(len).fill('')).slice(0, len)
-
-  const update = (i, char) => {
-    const next = [...chars]
-    next[i] = char
-    onChange(next.join(''))
-  }
-
-  return (
-    <div
-      className="flex items-center gap-1.5 sm:gap-2 justify-center"
-      onPaste={e => {
-        e.preventDefault()
-        const text = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, len)
-        onChange(text)
-        refs.current[Math.min(text.length, len - 1)]?.focus()
-      }}
-    >
-      {chars.map((c, i) => (
-        <div key={i} className="flex items-center gap-1.5 sm:gap-2">
-          <input
-            ref={el => { refs.current[i] = el }}
-            type="text"
-            inputMode="numeric"
-            maxLength={1}
-            value={c}
-            onChange={e => {
-              const v = e.target.value.replace(/\D/g, '').slice(-1)
-              update(i, v)
-              if (v && i < len - 1) refs.current[i + 1]?.focus()
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Backspace') {
-                if (!c && i > 0) { update(i - 1, ''); refs.current[i - 1]?.focus() }
-                else update(i, '')
-              }
-            }}
-            className="w-9 h-12 sm:w-10 sm:h-13 text-center text-lg font-bold border-2 rounded-xl outline-none focus:border-primary transition-colors bg-white text-gray-900"
-          />
-          {i === 3 && <div className="w-3 h-0.5 bg-gray-300 rounded flex-shrink-0" />}
-        </div>
-      ))}
-    </div>
-  )
 }
 
 // ── Page principale ──────────────────────────────────────────────

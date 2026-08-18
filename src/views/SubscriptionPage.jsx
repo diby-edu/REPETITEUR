@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
+import { supabase } from '../lib/supabase'
 
 import { SUBSCRIPTION_PLANS } from '../data/constants'
 import { StatusBadge } from '../components/common/Badge'
@@ -55,15 +56,14 @@ export default function SubscriptionPage() {
 
     // Plan payant → PayDunya
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/payments/paydunya/initiate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: plan.id,
-          planName: plan.name,
-          price: plan.price,
-          tutorId: currentUser.id,
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ planId: plan.id }),
       })
       const data = await res.json()
 

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import { SUBSCRIPTION_PLANS } from '../../../../../src/data/constants'
 
 const isLive = process.env.PAYDUNYA_MODE === 'live'
 
@@ -18,25 +20,49 @@ const pdHeaders = {
   'Content-Type': 'application/json',
 }
 
+// Client anon — sert uniquement à vérifier le token du tuteur connecté.
+const supabaseAuth = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
+
 export async function POST(request) {
   try {
-    const { planId, planName, price, tutorId } = await request.json()
+    // Le tuteur est dérivé de sa session authentifiée, jamais du body —
+    // sinon n'importe qui peut initier un paiement pour un autre tutorId.
+    const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+    if (!token) {
+      return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+    }
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Session invalide.' }, { status: 401 })
+    }
 
+    // Le prix est recalculé depuis SUBSCRIPTION_PLANS, jamais reçu du client —
+    // sinon un prix falsifié produit une facture PayDunya légitime pour ce montant.
+    const { planId } = await request.json()
+    const plan = SUBSCRIPTION_PLANS.find(p => p.id === planId)
+    if (!plan || !(plan.price > 0)) {
+      return NextResponse.json({ error: 'Plan invalide.' }, { status: 400 })
+    }
+
+    const tutorId = user.id
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
     const payload = {
       invoice: {
         items: {
           item_0: {
-            name: `Abonnement ${planName} — MonRépétiteur`,
+            name: `Abonnement ${plan.name} — MonRépétiteur`,
             quantity: 1,
-            unit_price: String(price),
-            total_price: String(price),
-            description: `Abonnement mensuel ${planName}`,
+            unit_price: String(plan.price),
+            total_price: String(plan.price),
+            description: `Abonnement mensuel ${plan.name}`,
           },
         },
-        total_amount: price,
-        description: `Abonnement ${planName} MonRépétiteur`,
+        total_amount: plan.price,
+        description: `Abonnement ${plan.name} MonRépétiteur`,
       },
       store: {
         name: 'MonRépétiteur',
@@ -45,12 +71,12 @@ export async function POST(request) {
       },
       actions: {
         cancel_url: `${appUrl}/abonnement`,
-        return_url: `${appUrl}/abonnement?status=success&plan=${planId}`,
+        return_url: `${appUrl}/abonnement?status=success&plan=${plan.id}`,
         callback_url: `${appUrl}/api/payments/paydunya/webhook`,
       },
       custom_data: {
         tutor_id: tutorId,
-        plan: planId,
+        plan: plan.id,
       },
     }
 

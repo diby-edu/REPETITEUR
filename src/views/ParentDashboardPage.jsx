@@ -56,7 +56,7 @@ export default function ParentDashboardPage() {
     loadUserConversations, loadUserEngagements, loadAllUserSessions,
     loadUserFavorites, getUserFavorites, loadUserNotifications,
     subscribeToNotifications, getTutor, getOrCreateConversation,
-    reportSession, declarePayment, endEngagement, runMaintenanceTasks,
+    reportSession, declarePayment, endEngagement, setSessionsDone, runMaintenanceTasks, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
   const { setSlot } = useHeaderSlot()
@@ -467,7 +467,8 @@ export default function ParentDashboardPage() {
                 {[...activeEngagements, ...pendingEngagements].map(e => {
                   const t = getTutor(e.tutorId)
                   const days = daysUntil(e.endDate)
-                  const sessCount = sessionsPerEng[e.id] || 0
+                  const pkg = levelPackages.find(p => p.levelKey === e.levelKey)
+                  const totalSessions = e.status === 'active' && pkg ? pkg.sessionsPerWeek * 4 : 0
                   return (
                     <div key={e.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                       <Avatar user={t} size="sm" />
@@ -480,12 +481,31 @@ export default function ParentDashboardPage() {
                         </p>
                         {e.status === 'active' && (
                           <p className="text-xs text-gray-400 mt-0.5">
-                            {sessCount} séance{sessCount !== 1 ? 's' : ''} ce mois
-                            {' · '}{formatFCFA(e.monthlyRate)}/mois
+                            {formatFCFA(e.monthlyRate)}/mois
                             {days >= 0 && days <= 7 && (
                               <span className="ml-1 text-orange-500 font-semibold">· Règlement dans {days} j</span>
                             )}
                           </p>
+                        )}
+                        {e.status === 'active' && totalSessions > 0 && (
+                          <div className="mt-1.5">
+                            <p className="text-[11px] text-gray-500 mb-1">Séances faites ce mois : <strong>{e.sessionsDone}/{totalSessions}</strong></p>
+                            <div className="flex flex-wrap gap-1">
+                              {Array.from({ length: totalSessions }).map((_, k) => {
+                                const done = k < e.sessionsDone
+                                return (
+                                  <button
+                                    key={k}
+                                    onClick={() => setSessionsDone(e.id, done ? k : k + 1)}
+                                    title={`Séance ${k + 1}`}
+                                    className={`w-6 h-6 rounded-md border text-[10px] flex items-center justify-center transition-colors ${done ? 'bg-secondary text-white border-secondary' : 'bg-white border-gray-300 text-gray-400 hover:border-secondary'}`}
+                                  >
+                                    {done ? '✓' : k + 1}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">

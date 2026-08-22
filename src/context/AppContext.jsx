@@ -192,6 +192,7 @@ function mapEngagement(row) {
     agreedSchedule: row.agreed_schedule,
     endedBy: row.ended_by,
     endedAt: row.ended_at,
+    sessionsDone: row.sessions_done || 0,
     monthlyRate: row.monthly_rate,
     notes: row.notes,
     schedule: row.schedule || [],
@@ -836,6 +837,15 @@ export function AppProvider({ children }) {
     return engagement
   }, [showToast])
 
+  // Le parent coche les séances faites du mois (compteur X/N).
+  const setSessionsDone = useCallback(async (engagementId, count) => {
+    const c = Math.max(0, Math.round(count))
+    const { error } = await supabase.from('engagements').update({ sessions_done: c }).eq('id', engagementId)
+    if (error) { showToast('Erreur.', 'error'); return false }
+    setEngagements(prev => prev.map(e => e.id !== engagementId ? e : { ...e, sessionsDone: c }))
+    return true
+  }, [showToast])
+
   // Mettre fin à un contrat (résiliation par le parent ou le répétiteur).
   const endEngagement = useCallback(async (engagementId, endedBy) => {
     const now = new Date().toISOString()
@@ -1063,6 +1073,9 @@ export function AppProvider({ children }) {
 
     if (error) { showToast('Erreur.', 'error'); return }
 
+    // Nouveau mois : on remet à zéro le compteur de séances faites.
+    await supabase.from('engagements').update({ sessions_done: 0 }).eq('id', engagementId)
+
     setPayments(prev => ({
       ...prev,
       [engagementId]: (prev[engagementId] || []).map(p =>
@@ -1128,7 +1141,7 @@ export function AppProvider({ children }) {
 
       // Engagements
       loadUserEngagements, getUserEngagements,
-      createEngagement, respondToEngagement, endEngagement,
+      createEngagement, respondToEngagement, endEngagement, setSessionsDone,
       proposeScheduleChange, respondToScheduleChange,
 
       // Séances

@@ -28,7 +28,9 @@ export default function SearchPage() {
   const setFilter = (key, val) => setFilters(p => ({ ...p, [key]: val }))
 
   const filtered = useMemo(() => {
-    let result = tutors.filter(t => t.isActive && t.verificationStatus === 'verified')
+    let result = tutors.filter(t =>
+      t.isActive && t.verificationStatus === 'verified' && !t.suspended
+      && t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
 
     if (filters.query) {
       const q = filters.query.toLowerCase()

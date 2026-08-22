@@ -254,7 +254,9 @@ export function AppProvider({ children }) {
   useEffect(() => { reloadTutors() }, [reloadTutors])
 
   const getTutor = (id) => tutors.find(t => t.id === id)
-  const getActiveTutors = () => tutors.filter(t => t.isActive && t.verificationStatus === 'verified')
+  const getActiveTutors = () => tutors.filter(t =>
+    t.isActive && t.verificationStatus === 'verified' && !t.suspended
+    && t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
   const getPendingTutors = () => tutors.filter(t => t.verificationStatus === 'pending')
 
   const validateTutor = useCallback(async (tutorId, decision, reason = '') => {
@@ -359,11 +361,15 @@ export function AppProvider({ children }) {
   }, [showToast])
 
   const unsuspendTutor = useCallback(async (tutorId) => {
-    const { error } = await supabase.from('tutors').update({ is_active: true, suspended: false }).eq('id', tutorId)
+    // La réactivation ne rend visible que si le répétiteur est vérifié ET a un
+    // abonnement payant actif — sinon is_active reste false (pas d'état bâtard).
+    const tutor = tutors.find(t => t.id === tutorId)
+    const isActive = computeIsActive(tutor?.verificationStatus, tutor?.subscription)
+    const { error } = await supabase.from('tutors').update({ is_active: isActive, suspended: false }).eq('id', tutorId)
     if (error) { showToast('Erreur.', 'error'); return }
-    setTutors(prev => prev.map(t => t.id !== tutorId ? t : { ...t, isActive: true, suspended: false }))
+    setTutors(prev => prev.map(t => t.id !== tutorId ? t : { ...t, isActive, suspended: false }))
     showToast('Compte réactivé.')
-  }, [showToast])
+  }, [tutors, showToast])
 
   const updateTutorAvailability = useCallback(async (tutorId, availability) => {
     const { error } = await supabase.from('tutors').update({ availability }).eq('id', tutorId)

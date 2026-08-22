@@ -52,7 +52,7 @@ export default function TutorDashboardPage() {
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
     respondToEngagement, confirmPayment,
-    runMaintenanceTasks,
+    runMaintenanceTasks, showToast,
   } = useApp()
   const { openChat } = useChatBubble()
   const { setSlot } = useHeaderSlot()
@@ -180,6 +180,8 @@ export default function TutorDashboardPage() {
 
   const handleContactParent = async (parentId) => {
     if (contactingId) return
+    // Fonctionnalité réservée aux abonnements payants actifs.
+    if (!tutor.isActive) { showToast('Passez à un plan payant pour contacter les parents.', 'error'); return }
     setContactingId(parentId)
     const conv = await getOrCreateConversation(tutor.id, parentId)
     setContactingId(null)
@@ -516,6 +518,13 @@ export default function TutorDashboardPage() {
               <Users size={36} className="text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-500 font-medium">Disponible après vérification de votre profil</p>
               <p className="text-xs text-gray-400 mt-1">Les coordonnées des parents sont réservées aux répétiteurs vérifiés.</p>
+            </div>
+          ) : !tutor.isActive ? (
+            <div className="card text-center py-8">
+              <Users size={36} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 font-medium">Réservé aux abonnés</p>
+              <p className="text-xs text-gray-400 mt-1 mb-3">Passez à un plan payant pour accéder aux demandes des parents et les contacter.</p>
+              <Link href="/abonnement" className="btn-primary text-xs py-2 inline-block">Voir les abonnements</Link>
             </div>
           ) : matchingParents.length === 0 ? (
             <div className="card text-center py-8">

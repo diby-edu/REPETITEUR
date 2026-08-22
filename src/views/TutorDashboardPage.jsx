@@ -111,9 +111,8 @@ export default function TutorDashboardPage() {
     if (!tutor?.city) return
     supabase
       .from('public_profiles')
-      .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_levels, join_date')
+      .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_levels, join_date, open_to_contact')
       .eq('role', 'parent')
-      .eq('open_to_contact', true)
       .eq('city', tutor.city)
       .order('join_date', { ascending: false })
       .limit(12)
@@ -126,6 +125,7 @@ export default function TutorDashboardPage() {
           id: p.id, firstName: p.first_name, lastName: p.last_name, city: p.city,
           avatarColor: p.avatar_color, childLevels: p.child_levels || [],
           subjectsNeeded: p.subjects_needed || [], joinDate: p.join_date,
+          openToContact: p.open_to_contact !== false,
         })))
       })
   }, [tutor?.city, tutor?.subjects])
@@ -184,6 +184,8 @@ export default function TutorDashboardPage() {
     if (contactingId) return
     // Fonctionnalité réservée aux abonnements payants actifs.
     if (!tutor.isActive) { showToast('Passez à un plan payant pour contacter les parents.', 'error'); return }
+    const par = matchingParents.find(p => p.id === parentId)
+    if (par && par.openToContact === false) { showToast('Ce parent ne souhaite pas être contacté par message.', 'error'); return }
     setContactingId(parentId)
     const conv = await getOrCreateConversation(tutor.id, parentId)
     setContactingId(null)
@@ -568,16 +570,22 @@ export default function TutorDashboardPage() {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleContactParent(par.id)}
-                    disabled={contactingId === par.id}
-                    className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    {contactingId === par.id
-                      ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      : <Send size={13} />}
-                    Contacter
-                  </button>
+                  {par.openToContact === false ? (
+                    <div className="mt-auto text-center bg-gray-50 border border-gray-200 rounded-xl py-2 px-2">
+                      <p className="text-xs text-gray-500 font-medium">🔕 Ne souhaite pas être contacté</p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleContactParent(par.id)}
+                      disabled={contactingId === par.id}
+                      className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {contactingId === par.id
+                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        : <Send size={13} />}
+                      Contacter
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -22,7 +22,7 @@ const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', 
 // s'affichent correctement ici.
 const SLOTS = ['8h-10h', '10h-12h', '12h-14h', '14h-16h', '16h-18h', '18h-20h']
 
-const TABS_TUTOR = ['Profil', 'Tarifs', 'Documents', 'Disponibilités', 'Sécurité', 'Notifications']
+const TABS_TUTOR = ['Profil', 'Tarifs', 'Documents', 'Sécurité', 'Notifications']
 const TABS_OTHER = ['Profil', 'Sécurité', 'Notifications']
 const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Admin' }
 
@@ -779,69 +779,6 @@ export default function SettingsPage() {
             )}
 
             {/* Availability tab (tutors only) */}
-            {activeTab === 'Disponibilités' && (
-              <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                  <Clock size={18} className="text-primary" />
-                  Mes créneaux disponibles
-                </h2>
-                <p className="text-xs text-gray-400 mb-5">Cliquez sur un créneau pour l'activer ou le désactiver. Les créneaux en orange sont disponibles.</p>
-
-                <div className="overflow-x-auto -mx-2">
-                  <table className="min-w-full text-xs">
-                    <thead>
-                      <tr>
-                        <th className="pr-3 pb-2 text-left text-gray-400 font-medium w-16">Créneau</th>
-                        {DAYS.map(d => (
-                          <th key={d} className="pb-2 text-center text-gray-600 font-semibold px-1">
-                            {DAY_LABELS[d]}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {SLOTS.map(time => (
-                        <tr key={time} className="border-t border-gray-50">
-                          <td className="pr-3 py-1 text-gray-400 font-mono whitespace-nowrap">{time}</td>
-                          {DAYS.map(day => {
-                            const active = (availability[day] || []).includes(time)
-                            return (
-                              <td key={day} className="px-1 py-1 text-center">
-                                <button
-                                  onClick={() => toggleSlot(day, time)}
-                                  className={`w-full h-7 rounded-lg transition-colors text-xs font-medium ${
-                                    active
-                                      ? 'bg-primary text-white'
-                                      : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
-                                  }`}
-                                  title={`${DAY_LABELS[day]} ${time}`}
-                                >
-                                  {active ? '✓' : ''}
-                                </button>
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex items-center gap-4 mt-5 pt-4 border-t border-gray-100">
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span className="w-4 h-4 bg-primary rounded inline-block" />
-                    Disponible
-                    <span className="w-4 h-4 bg-gray-100 rounded inline-block ml-2" />
-                    Non disponible
-                  </div>
-                  <button onClick={handleSaveAvailability} className="btn-primary ml-auto flex items-center gap-2 text-sm">
-                    <Save size={15} />
-                    Enregistrer
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Security tab */}
             {activeTab === 'Sécurité' && (
               <div className="space-y-4">

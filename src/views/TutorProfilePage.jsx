@@ -22,6 +22,7 @@ export default function TutorProfilePage() {
   const [bookingForm, setBookingForm] = useState({ date: '', time: '', duration: '60', subject: '', location: 'domicile_parent', notes: '' })
   const [subForm, setSubForm] = useState({ levelKey: '', schedule: '' })
   const [subscribing, setSubscribing] = useState(false)
+  const [showOffers, setShowOffers] = useState(true)
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
   const [respondingTo, setRespondingTo] = useState(null)
   const [response, setResponse] = useState('')
@@ -201,15 +202,22 @@ export default function TutorProfilePage() {
             {/* Offres & tarifs par niveau */}
             {tutor.offers?.length > 0 && (
               <div className="card mb-5">
-                <h2 className="font-semibold text-gray-900 mb-3">Offres & tarifs par niveau</h2>
-                <div className="space-y-2">
+                <button
+                  onClick={() => setShowOffers(v => !v)}
+                  className="w-full flex items-center justify-between text-left"
+                >
+                  <h2 className="font-semibold text-gray-900">Offres & tarifs par niveau <span className="text-xs text-gray-400 font-normal">({tutor.offers.length})</span></h2>
+                  <span className="text-gray-400 text-sm">{showOffers ? '▾ Réduire' : '▸ Afficher'}</span>
+                </button>
+                {showOffers && (
+                <div className="space-y-2 mt-3">
                   {tutor.offers.map(o => {
                     const pkg = levelPackages.find(p => p.levelKey === o.levelKey)
                     return (
                       <div key={o.levelKey} className="flex items-start justify-between gap-3 border border-gray-100 rounded-xl p-3">
                         <div className="min-w-0">
                           <p className="font-semibold text-gray-800">{pkg?.label || o.levelKey}</p>
-                          {pkg && <p className="text-xs text-gray-400">{pkg.sessionsPerWeek} séances/sem · {pkg.hoursPerSession}h/séance · {pkg.hoursPerMonth}h/mois</p>}
+                          {pkg && <p className="text-xs text-gray-400">{pkg.sessionsPerWeek} séances par semaine · {pkg.hoursPerSession}h par séance · {pkg.hoursPerMonth}h par mois</p>}
                           {o.subjects?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1.5">
                               {o.subjects.map(s => <span key={s} className="text-xs bg-primary-50 text-primary-600 px-2 py-0.5 rounded-full">{s}</span>)}
@@ -221,6 +229,7 @@ export default function TutorProfilePage() {
                     )
                   })}
                 </div>
+                )}
               </div>
             )}
 
@@ -503,16 +512,10 @@ export default function TutorProfilePage() {
               </div>
 
               {tutor.isActive ? (
-                <>
-                  <button onClick={handleContact} className="btn-primary w-full flex items-center justify-center gap-2 mb-2">
-                    <MessageCircle size={18} />
-                    Contacter
-                  </button>
-                  <button onClick={() => setActiveTab('réservation')} className="btn-outline w-full flex items-center justify-center gap-2">
-                    <Calendar size={18} />
-                    Demander une séance
-                  </button>
-                </>
+                <button onClick={handleContact} className="btn-primary w-full flex items-center justify-center gap-2">
+                  <MessageCircle size={18} />
+                  Contacter
+                </button>
               ) : (
                 <div className="bg-gray-50 rounded-xl p-4 text-center">
                   <InactiveBadge />
@@ -542,7 +545,7 @@ export default function TutorProfilePage() {
 
                   {selectedOffer && (
                     <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-                      {selectedPkg && <p>Forfait : <strong>{selectedPkg.sessionsPerWeek} séances/sem · {selectedPkg.hoursPerSession}h/séance · {selectedPkg.hoursPerMonth}h/mois</strong></p>}
+                      {selectedPkg && <p>Forfait : <strong>{selectedPkg.sessionsPerWeek} séances par semaine · {selectedPkg.hoursPerSession}h par séance · {selectedPkg.hoursPerMonth}h par mois</strong></p>}
                       {selectedOffer.subjects?.length > 0 && <p>Matières : {selectedOffer.subjects.join(', ')}</p>}
                       <p>Tarif : <strong className="text-primary">{formatFCFA(selectedOffer.monthlyPrice)}/mois</strong></p>
                     </div>
@@ -550,7 +553,14 @@ export default function TutorProfilePage() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Jours souhaités (à convenir avec le répétiteur)</label>
-                    <textarea className="input-field text-sm py-2 h-20 resize-none" placeholder="Ex. Lundi 17h-19h · Mercredi 17h-19h" value={subForm.schedule} onChange={e => setSubForm(p => ({ ...p, schedule: e.target.value }))} />
+                    <textarea
+                      className="input-field text-sm py-2 h-20 resize-none"
+                      placeholder={selectedPkg
+                        ? `Proposez ${selectedPkg.sessionsPerWeek} créneau${selectedPkg.sessionsPerWeek > 1 ? 'x' : ''} par semaine — ex. Lundi 17h-19h${selectedPkg.sessionsPerWeek > 1 ? ' · Mercredi 17h-19h' : ''}`
+                        : "Choisissez d'abord un niveau ci-dessus"}
+                      value={subForm.schedule}
+                      onChange={e => setSubForm(p => ({ ...p, schedule: e.target.value }))}
+                    />
                   </div>
 
                   {isAuthenticated ? (
@@ -562,7 +572,7 @@ export default function TutorProfilePage() {
                       Se connecter pour souscrire
                     </Link>
                   )}
-                  <p className="text-[11px] text-gray-400 text-center">Le répétiteur devra accepter. Le paiement se fait en fin de mois, après les séances.</p>
+                  <p className="text-[11px] text-gray-400 text-center">Le répétiteur doit d'abord accepter votre demande. Vous réglez à la fin de chaque mois, une fois les séances du mois assurées.</p>
                 </form>
               </div>
             )}

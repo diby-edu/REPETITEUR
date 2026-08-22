@@ -45,12 +45,17 @@ function mapTutor(profile, tutor) {
     diplomaNames: tutor.verification_status === 'verified'
       ? (tutor.documents?.diplomes || []).map(d => d?.name).filter(Boolean)
       : [],
+    offers: [],
+    priceMin: tutor.monthly_rate || 0,
+    priceMax: tutor.monthly_rate || 0,
   }
 }
 
 // Mappe une ligne de la vue publique `public_tutors` (colonnes vitrine,
 // SANS email/téléphone/documents KYC) vers la même forme que mapTutor.
 function mapPublicTutor(r) {
+  const offers = (r.offers || []).map(o => ({ levelKey: o.level_key, subjects: o.subjects || [], monthlyPrice: o.monthly_price }))
+  const prices = offers.map(o => o.monthlyPrice).filter(p => typeof p === 'number')
   return {
     id: r.id,
     role: 'tutor',
@@ -85,6 +90,9 @@ function mapPublicTutor(r) {
     isActive: r.is_active,
     suspended: r.suspended,
     diplomaNames: r.diploma_names || [],
+    offers,
+    priceMin: prices.length ? Math.min(...prices) : (r.monthly_rate || 0),
+    priceMax: prices.length ? Math.max(...prices) : (r.monthly_rate || 0),
   }
 }
 

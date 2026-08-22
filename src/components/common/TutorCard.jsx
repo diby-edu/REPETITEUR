@@ -12,6 +12,9 @@ import { useApp } from '../../context/AppContext'
 export default function TutorCard({ tutor, compact = false }) {
   const isVerified = tutor.verificationStatus === 'verified'
   const isPremium = tutor.subscription?.plan === 'premium'
+  const priceLabel = (tutor.priceMin && tutor.priceMax && tutor.priceMin !== tutor.priceMax)
+    ? `${formatFCFA(tutor.priceMin)} – ${formatFCFA(tutor.priceMax)}`
+    : formatFCFA(tutor.priceMin || tutor.monthlyRate || 0)
   const { currentUser, isAuthenticated } = useAuth()
   const { getOrCreateConversation, showToast } = useApp()
   const router = useRouter()
@@ -36,7 +39,7 @@ export default function TutorCard({ tutor, compact = false }) {
           <p className="text-xs text-gray-500 truncate">{tutor.subjects.slice(0, 2).join(', ')}</p>
           <StarRating rating={tutor.rating} size={12} count={tutor.reviewCount} />
         </div>
-        <p className="text-sm font-bold text-primary whitespace-nowrap">{formatFCFA(tutor.monthlyRate)}<span className="text-xs font-normal text-gray-400">/mois</span></p>
+        <p className="text-sm font-bold text-primary whitespace-nowrap">{priceLabel}<span className="text-xs font-normal text-gray-400">/mois</span></p>
       </Link>
     )
   }
@@ -131,7 +134,7 @@ export default function TutorCard({ tutor, compact = false }) {
           <div className="flex items-center justify-between bg-primary-50 rounded-xl px-3 py-2">
             <span className="text-xs text-gray-500 font-medium">Tarif mensuel</span>
             <span className="text-base font-bold text-primary">
-              {formatFCFA(tutor.monthlyRate)}<span className="text-xs font-normal text-gray-400 ml-1">/ mois</span>
+              {priceLabel}<span className="text-xs font-normal text-gray-400 ml-1">/ mois</span>
             </span>
           </div>
         </div>

@@ -15,7 +15,7 @@ const DAY_ORDER = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 
 
 export default function TutorProfilePage() {
   const { id } = useParams()
-  const { getTutor, getTutorReviews, getOrCreateConversation, createBooking, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors } = useApp()
+  const { getTutor, getTutorReviews, getOrCreateConversation, createBooking, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors, levelPackages } = useApp()
   const { currentUser, isAuthenticated } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('profil')
@@ -56,6 +56,9 @@ export default function TutorProfilePage() {
 
   const isVerified = tutor.verificationStatus === 'verified'
   const isPremium = tutor.subscription?.plan === 'premium'
+  const priceLabel = (tutor.priceMin && tutor.priceMax && tutor.priceMin !== tutor.priceMax)
+    ? `${formatFCFA(tutor.priceMin)} – ${formatFCFA(tutor.priceMax)}`
+    : formatFCFA(tutor.priceMin || tutor.monthlyRate || 0)
 
   const handleContact = async () => {
     if (!isAuthenticated) { router.push('/connexion'); return }
@@ -157,7 +160,7 @@ export default function TutorProfilePage() {
                 </div>
 
                 <div className="text-right">
-                  <p className="text-3xl font-bold text-primary">{formatFCFA(tutor.monthlyRate)}</p>
+                  <p className="text-3xl font-bold text-primary">{priceLabel}</p>
                   <p className="text-sm text-gray-400">par mois</p>
                   {isAuthenticated && currentUser?.role === 'parent' && (
                     <button
@@ -173,6 +176,32 @@ export default function TutorProfilePage() {
                 </div>
               </div>
             </div>
+
+            {/* Offres & tarifs par niveau */}
+            {tutor.offers?.length > 0 && (
+              <div className="card mb-5">
+                <h2 className="font-semibold text-gray-900 mb-3">Offres & tarifs par niveau</h2>
+                <div className="space-y-2">
+                  {tutor.offers.map(o => {
+                    const pkg = levelPackages.find(p => p.levelKey === o.levelKey)
+                    return (
+                      <div key={o.levelKey} className="flex items-start justify-between gap-3 border border-gray-100 rounded-xl p-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-800">{pkg?.label || o.levelKey}</p>
+                          {pkg && <p className="text-xs text-gray-400">{pkg.sessionsPerWeek} séances/sem · {pkg.hoursPerSession}h/séance · {pkg.hoursPerMonth}h/mois</p>}
+                          {o.subjects?.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {o.subjects.map(s => <span key={s} className="text-xs bg-primary-50 text-primary-600 px-2 py-0.5 rounded-full">{s}</span>)}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-primary font-bold whitespace-nowrap">{formatFCFA(o.monthlyPrice)}<span className="text-xs font-normal text-gray-400">/mois</span></p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Tabs */}
             <div className="flex border-b border-gray-200 mb-5 bg-white rounded-t-xl overflow-hidden">
@@ -448,7 +477,7 @@ export default function TutorProfilePage() {
             {/* Contact / Book */}
             <div className="card">
               <div className="text-center mb-4">
-                <p className="text-3xl font-bold text-primary">{formatFCFA(tutor.monthlyRate)}</p>
+                <p className="text-3xl font-bold text-primary">{priceLabel}</p>
                 <p className="text-sm text-gray-400">/ mois</p>
               </div>
 

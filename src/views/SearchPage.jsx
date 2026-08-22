@@ -3,13 +3,13 @@ import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useApp } from '../context/AppContext'
 import TutorCard from '../components/common/TutorCard'
-import { SUBJECTS, LEVELS, CITIES } from '../data/constants'
+import { SUBJECTS, CITIES } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
 import { Search, SlidersHorizontal, X, LayoutGrid, List, Home, Building2, Users, Wifi } from 'lucide-react'
 
 export default function SearchPage() {
   const searchParams = useSearchParams()
-  const { tutors } = useApp()
+  const { tutors, levelPackages } = useApp()
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [viewMode, setViewMode] = useState('grid')
 
@@ -17,7 +17,7 @@ export default function SearchPage() {
     query: searchParams.get('q') || '',
     city: searchParams.get('ville') || '',
     subject: searchParams.get('matiere') || '',
-    level: searchParams.get('niveau') || '',
+    levelKey: searchParams.get('classe') || '',
     minPrice: '',
     maxPrice: '',
     modality: '',
@@ -32,26 +32,29 @@ export default function SearchPage() {
       t.isActive && t.verificationStatus === 'verified' && !t.suspended
       && t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
 
+    // matières couvertes par les offres du répétiteur (par classe)
+    const offerSubjects = t => (t.offers || []).flatMap(o => o.subjects || [])
+
     if (filters.query) {
       const q = filters.query.toLowerCase()
       result = result.filter(t =>
         `${t.firstName} ${t.lastName}`.toLowerCase().includes(q) ||
-        t.subjects?.some(s => s.toLowerCase().includes(q)) ||
+        offerSubjects(t).some(s => s.toLowerCase().includes(q)) ||
         t.bio?.toLowerCase().includes(q)
       )
     }
     if (filters.city) result = result.filter(t => t.city.toLowerCase().includes(filters.city.toLowerCase()))
-    if (filters.subject) result = result.filter(t => t.subjects.includes(filters.subject))
-    if (filters.level) result = result.filter(t => t.levels.includes(filters.level))
-    if (filters.minPrice) result = result.filter(t => t.monthlyRate >= parseInt(filters.minPrice))
-    if (filters.maxPrice) result = result.filter(t => t.monthlyRate <= parseInt(filters.maxPrice))
+    if (filters.subject) result = result.filter(t => (t.offers || []).some(o => (o.subjects || []).includes(filters.subject)))
+    if (filters.levelKey) result = result.filter(t => (t.offers || []).some(o => o.levelKey === filters.levelKey))
+    if (filters.minPrice) result = result.filter(t => t.priceMax >= parseInt(filters.minPrice))
+    if (filters.maxPrice) result = result.filter(t => t.priceMin <= parseInt(filters.maxPrice))
     if (filters.modality) result = result.filter(t => t.modalities?.includes(filters.modality))
     if (filters.verifiedOnly) result = result.filter(t => t.verificationStatus === 'verified')
 
     switch (filters.sortBy) {
       case 'note': return [...result].sort((a, b) => b.rating - a.rating)
-      case 'prix_asc': return [...result].sort((a, b) => a.monthlyRate - b.monthlyRate)
-      case 'prix_desc': return [...result].sort((a, b) => b.monthlyRate - a.monthlyRate)
+      case 'prix_asc': return [...result].sort((a, b) => a.priceMin - b.priceMin)
+      case 'prix_desc': return [...result].sort((a, b) => b.priceMax - a.priceMax)
       default:
         return [...result].sort((a, b) => {
           const premA = a.subscription?.plan === 'premium' ? 1 : 0
@@ -63,11 +66,11 @@ export default function SearchPage() {
   }, [tutors, filters])
 
   const clearFilters = () => setFilters({
-    query: '', city: '', subject: '', level: '',
+    query: '', city: '', subject: '', levelKey: '',
     minPrice: '', maxPrice: '', modality: '', verifiedOnly: false, sortBy: 'pertinence',
   })
 
-  const hasActiveFilters = filters.city || filters.subject || filters.level ||
+  const hasActiveFilters = filters.city || filters.subject || filters.levelKey ||
     filters.minPrice || filters.maxPrice || filters.modality || filters.verifiedOnly
 
   const FilterPanel = () => (
@@ -81,21 +84,11 @@ export default function SearchPage() {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Niveau</label>
-        <div className="flex flex-col gap-2">
-          {['', ...LEVELS].map(l => (
-            <label key={l} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="level"
-                checked={filters.level === l}
-                onChange={() => setFilter('level', l)}
-                className="accent-primary"
-              />
-              <span className="text-sm text-gray-700">{l || 'Tous les niveaux'}</span>
-            </label>
-          ))}
-        </div>
+        <label className="block text-sm font-semibold text-gray-700 mb-2">Classe</label>
+        <select className="input-field" value={filters.levelKey} onChange={e => setFilter('levelKey', e.target.value)}>
+          <option value="">Toutes les classes</option>
+          {levelPackages.map(p => <option key={p.levelKey} value={p.levelKey}>{p.label}</option>)}
+        </select>
       </div>
 
       <div>

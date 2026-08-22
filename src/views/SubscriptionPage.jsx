@@ -247,6 +247,13 @@ export default function SubscriptionPage() {
         )}
 
         {/* Plans */}
+        <div className="mb-6 flex items-start gap-2 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+          <span className="text-lg leading-none">⚠️</span>
+          <p className="text-sm text-yellow-800">
+            <strong>Important :</strong> si votre abonnement n'est pas renouvelé à l'échéance, votre profil est automatiquement <strong>masqué des recherches</strong> et vos <strong>contrats actifs sont résiliés</strong>. Restez à jour pour conserver vos familles et votre visibilité.
+          </p>
+        </div>
+
         <div className="grid md:grid-cols-3 gap-5 mb-8">
           {SUBSCRIPTION_PLANS.map(plan => {
             const isCurrent = currentPlan === plan.id

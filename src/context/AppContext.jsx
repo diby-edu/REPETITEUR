@@ -1102,6 +1102,7 @@ export function AppProvider({ children }) {
   const runMaintenanceTasks = useCallback(async () => {
     await supabase.rpc('expire_ended_engagements')
     await supabase.rpc('check_expiring_engagements')
+    await supabase.rpc('expire_lapsed_subscriptions')  // abonnement impayé → profil masqué + contrats résiliés
   }, [])
 
   // ── CONTEXT VALUE ────────────────────────────────────────────

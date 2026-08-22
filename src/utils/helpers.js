@@ -57,16 +57,22 @@ export function getSubscriptionDaysLeft(endDate) {
 }
 
 export function filterPhoneAndEmail(text) {
-  // Remove phone numbers
-  let filtered = text.replace(
-    /(\+?\d[\d\s\-().]{7,}\d)/g,
-    '[numéro masqué]'
-  )
-  // Remove emails
+  let filtered = text
+  // Emails standards
   filtered = filtered.replace(
     /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g,
     '[email masqué]'
   )
+  // Emails obfusqués : "nom (at) gmail (point) com" — parenthèses/crochets requis
+  // pour éviter les faux positifs sur du texte normal.
+  filtered = filtered.replace(
+    /[a-zA-Z0-9._%+\-]{2,}\s*[\(\[]\s*(?:@|at|arobase)\s*[\)\]]\s*[a-zA-Z0-9.\-]{2,}\s*[\(\[]\s*(?:\.|point|dot)\s*[\)\]]\s*[a-zA-Z]{2,}/gi,
+    '[email masqué]'
+  )
+  // Numéros de téléphone (avec ou sans séparateurs)
+  filtered = filtered.replace(/(\+?\d[\d\s\-.()]{6,}\d)/g, '[numéro masqué]')
+  // Longues séquences de chiffres collés (8+)
+  filtered = filtered.replace(/\b\d{8,}\b/g, '[numéro masqué]')
   return filtered
 }
 

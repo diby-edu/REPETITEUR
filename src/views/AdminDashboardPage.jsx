@@ -212,7 +212,7 @@ function SparklineChart({ data, height = 80 }) {
 }
 
 export default function AdminDashboardPage() {
-  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, showToast, reloadTutors } = useApp()
+  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -226,6 +226,10 @@ export default function AdminDashboardPage() {
   const [rejectModal, setRejectModal]       = useState(null)
   const [rejectReason, setRejectReason]     = useState('')
   const [approveModal, setApproveModal]     = useState(null)
+  const [subModal, setSubModal]             = useState(null)   // activation manuelle d'abonnement
+  const [subPlan, setSubPlan]               = useState('standard')
+  const [subMonths, setSubMonths]           = useState(1)
+  const [subBusy, setSubBusy]               = useState(false)
   const [userFilter, setUserFilter]         = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')   // 'all' | 'tutor' | 'parent'
   const [userStatusFilter, setUserStatusFilter] = useState('all') // 'all' | 'verified' | 'pending' | 'rejected'
@@ -572,6 +576,69 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Activation manuelle d'abonnement (paiement hors ligne) */}
+      {subModal && (() => {
+        const preview = (() => { const d = new Date(); d.setMonth(d.getMonth() + Number(subMonths)); return d.toISOString().split('T')[0] })()
+        const verified = subModal.verificationStatus === 'verified'
+        const price = subPlan === 'premium' ? 5000 : 3000
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-accent-50 rounded-xl flex items-center justify-center">
+                  <Wallet size={20} className="text-accent" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Activer un abonnement</h3>
+                  <p className="text-sm text-gray-500">{subModal.firstName} {subModal.lastName}</p>
+                </div>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+              <select className="input-field mb-3" value={subPlan} onChange={e => setSubPlan(e.target.value)}>
+                <option value="standard">Standard — 3 000 FCFA/mois</option>
+                <option value="premium">Premium — 5 000 FCFA/mois</option>
+              </select>
+
+              <label className="block text-sm font-medium text-gray-700 mb-1">Durée</label>
+              <select className="input-field mb-3" value={subMonths} onChange={e => setSubMonths(Number(e.target.value))}>
+                <option value={1}>1 mois</option>
+                <option value={3}>3 mois</option>
+                <option value={6}>6 mois</option>
+                <option value={12}>12 mois</option>
+              </select>
+
+              <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-600 space-y-1">
+                <p>Montant encaissé : <strong>{formatFCFA(price * subMonths)}</strong> ({subMonths} mois)</p>
+                <p>Actif jusqu'au : <strong>{formatDateShort(preview)}</strong></p>
+              </div>
+
+              {!verified && (
+                <p className="mt-3 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                  ⚠️ Ce répétiteur n'est pas encore vérifié : l'abonnement sera enregistré, mais le profil ne deviendra visible dans les recherches qu'une fois le dossier vérifié.
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setSubModal(null)} className="btn-outline flex-1" disabled={subBusy}>Annuler</button>
+                <button
+                  onClick={async () => {
+                    setSubBusy(true)
+                    const ok = await updateTutorSubscription(subModal.id, subPlan, subMonths)
+                    setSubBusy(false)
+                    if (ok) setSubModal(null)
+                  }}
+                  disabled={subBusy}
+                  className="flex-1 bg-secondary text-white font-semibold px-6 py-3 rounded-full hover:bg-secondary-600 transition-colors disabled:opacity-60"
+                >
+                  {subBusy ? 'Activation…' : 'Activer l\'abonnement'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="max-w-5xl mx-auto px-6 py-6">
         <style>{`@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}`}</style>
@@ -1051,6 +1118,16 @@ export default function AdminDashboardPage() {
                       <p className="text-xs text-gray-400">exp. {formatDateShort(tutor.subscription.endDate)}</p>
                     )}
                   </div>
+                  <button
+                    onClick={() => {
+                      setSubPlan(tutor.subscription?.plan && tutor.subscription.plan !== 'gratuit' ? tutor.subscription.plan : 'standard')
+                      setSubMonths(1)
+                      setSubModal(tutor)
+                    }}
+                    className="flex-shrink-0 text-xs font-bold text-white bg-secondary hover:bg-secondary-600 px-3 py-2 rounded-xl whitespace-nowrap"
+                  >
+                    Activer
+                  </button>
                 </div>
               ))}
             </div>

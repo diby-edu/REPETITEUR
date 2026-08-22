@@ -316,11 +316,14 @@ export function AppProvider({ children }) {
     showToast(decision === 'approved' ? 'Document approuvé.' : 'Document rejeté.')
   }, [tutors, showToast])
 
-  const updateTutorSubscription = useCallback(async (tutorId, plan) => {
-    const endDate = new Date()
-    endDate.setMonth(endDate.getMonth() + 1)
+  // Activation manuelle d'un abonnement par l'admin (paiement hors ligne :
+  // cash / mobile money remis en main propre). `months` = durée en mois.
+  // is_active ne passe à true que si le répétiteur est déjà vérifié.
+  const updateTutorSubscription = useCallback(async (tutorId, plan, months = 1) => {
     const startDate = new Date().toISOString().split('T')[0]
-    const endDateStr = endDate.toISOString().split('T')[0]
+    const end = new Date()
+    end.setMonth(end.getMonth() + Number(months || 1))
+    const endDateStr = end.toISOString().split('T')[0]
     const tutor = tutors.find(t => t.id === tutorId)
     const isActive = tutor?.verificationStatus === 'verified' && plan !== 'gratuit'
 
@@ -332,11 +335,20 @@ export function AppProvider({ children }) {
       is_active: isActive,
     }).eq('id', tutorId)
 
-    if (error) { showToast('Erreur abonnement.', 'error'); return }
+    if (error) { showToast('Erreur abonnement.', 'error'); return false }
     setTutors(prev => prev.map(t => t.id !== tutorId ? t : {
       ...t, subscription: { plan, startDate, endDate: endDateStr, status: 'active' }, isActive,
     }))
-    showToast(`Abonnement ${plan} activé !`)
+    // Notifier le répétiteur (best-effort : l'admin est autorisé par le RLS).
+    await supabase.from('notifications').insert({
+      user_id: tutorId,
+      type: 'subscription',
+      title: 'Abonnement activé',
+      message: `Votre abonnement ${plan} a été activé jusqu'au ${endDateStr}.`,
+      link: '/abonnement',
+    })
+    showToast(`Abonnement ${plan} activé${isActive ? '' : ' — profil visible une fois vérifié'} !`)
+    return true
   }, [tutors, showToast])
 
   const suspendTutor = useCallback(async (tutorId) => {

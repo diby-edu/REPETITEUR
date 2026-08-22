@@ -19,8 +19,10 @@ export default function ChatBubble() {
   const [inputValue, setInputValue] = useState('')
   const [warning, setWarning] = useState(false)
   const [otherUserCache, setOtherUserCache] = useState({})
+  const [pulse, setPulse] = useState(false)   // animation à la réception d'un message
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const prevUnreadRef = useRef(0)
 
   // Valeurs dérivées — null-safe pour fonctionner avant et après connexion
   const conversations = isAuthenticated && currentUser
@@ -99,6 +101,35 @@ export default function ChatBubble() {
   useEffect(() => {
     conversations.forEach(conv => resolveOtherUser(conv))
   }, [conversations.length])
+
+  // Charge les conversations dès le montage → badge correct sans ouvrir la bulle.
+  useEffect(() => {
+    if (currentUser?.id) loadUserConversations(currentUser.id)
+  }, [currentUser?.id, loadUserConversations])
+
+  // Realtime GLOBAL : met à jour le badge en temps réel MÊME bulle fermée
+  // (parent comme répétiteur). Écoute les changements de mes conversations.
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const reload = () => loadUserConversations(currentUser.id)
+    const ch = supabase
+      .channel(`bubble-convs:${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `participant_1=eq.${currentUser.id}` }, reload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `participant_2=eq.${currentUser.id}` }, reload)
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [currentUser?.id, loadUserConversations])
+
+  // Déclenche l'animation quand le nombre de non-lus augmente (bulle fermée).
+  useEffect(() => {
+    if (totalUnread > prevUnreadRef.current && !isOpen) {
+      setPulse(true)
+      const t = setTimeout(() => setPulse(false), 1800)
+      prevUnreadRef.current = totalUnread
+      return () => clearTimeout(t)
+    }
+    prevUnreadRef.current = totalUnread
+  }, [totalUnread, isOpen])
 
   // ── Guard — pas de bulle si non connecté (après tous les hooks) ─
   if (!isAuthenticated || !currentUser) return null
@@ -272,14 +303,18 @@ export default function ChatBubble() {
       {/* ── Bouton flottant ── */}
       <button
         onClick={() => setIsOpen(o => !o)}
-        className="w-14 h-14 bg-primary text-white rounded-full shadow-xl flex items-center justify-center hover:bg-primary-600 transition-all hover:scale-105 active:scale-95 relative pointer-events-auto"
-        aria-label="Ouvrir les messages"
+        className={`w-14 h-14 bg-primary text-white rounded-full shadow-xl flex items-center justify-center hover:bg-primary-600 transition-all hover:scale-105 active:scale-95 relative pointer-events-auto ${pulse ? 'animate-bounce' : ''}`}
+        aria-label={totalUnread > 0 ? `Messages — ${totalUnread} non lus` : 'Ouvrir les messages'}
       >
         {isOpen ? <X size={22} /> : <MessageCircle size={22} />}
         {!isOpen && totalUnread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold px-1 leading-none">
-            {totalUnread > 9 ? '9+' : totalUnread}
-          </span>
+          <>
+            {/* onde à la réception d'un nouveau message */}
+            {pulse && <span className="absolute inset-0 rounded-full bg-primary/40 animate-ping" />}
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold px-1 leading-none ring-2 ring-white">
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </span>
+          </>
         )}
       </button>
     </div>

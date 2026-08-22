@@ -190,6 +190,8 @@ function mapEngagement(row) {
     levelKey: row.level_key,
     subjects: row.subjects || [],
     agreedSchedule: row.agreed_schedule,
+    endedBy: row.ended_by,
+    endedAt: row.ended_at,
     monthlyRate: row.monthly_rate,
     notes: row.notes,
     schedule: row.schedule || [],
@@ -834,6 +836,18 @@ export function AppProvider({ children }) {
     return engagement
   }, [showToast])
 
+  // Mettre fin à un contrat (résiliation par le parent ou le répétiteur).
+  const endEngagement = useCallback(async (engagementId, endedBy) => {
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('engagements').update({
+      status: 'ended', ended_by: endedBy, ended_at: now,
+    }).eq('id', engagementId)
+    if (error) { showToast('Erreur lors de la résiliation.', 'error'); return false }
+    setEngagements(prev => prev.map(e => e.id !== engagementId ? e : { ...e, status: 'ended', endedBy, endedAt: now }))
+    showToast('Contrat terminé.')
+    return true
+  }, [showToast])
+
   // Répétiteur accepte ou refuse un engagement proposé
   const respondToEngagement = useCallback(async (engagementId, accept) => {
     const newStatus = accept ? 'active' : 'ended'
@@ -1114,7 +1128,7 @@ export function AppProvider({ children }) {
 
       // Engagements
       loadUserEngagements, getUserEngagements,
-      createEngagement, respondToEngagement,
+      createEngagement, respondToEngagement, endEngagement,
       proposeScheduleChange, respondToScheduleChange,
 
       // Séances

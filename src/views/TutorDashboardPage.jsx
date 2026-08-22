@@ -51,7 +51,7 @@ export default function TutorDashboardPage() {
     getOrCreateConversation,
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
-    respondToEngagement, confirmPayment,
+    respondToEngagement, confirmPayment, endEngagement,
     runMaintenanceTasks, showToast, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
@@ -72,6 +72,8 @@ export default function TutorDashboardPage() {
   const [conversationPartners, setConversationPartners] = useState({})
   const [parentProfiles, setParentProfiles]         = useState({})
   const [pendingPayments, setPendingPayments]       = useState([])
+  const [endModal, setEndModal]                     = useState(null)   // contrat à résilier
+  const [endLoading, setEndLoading]                 = useState(false)
   const [contactingId, setContactingId]             = useState(null)
   const [respondingId, setRespondingId]             = useState(null)
 
@@ -710,6 +712,7 @@ export default function TutorDashboardPage() {
                       <div className="text-right flex-shrink-0">
                         <p className="text-sm font-black text-gray-900">{formatFCFA(e.monthlyRate)}</p>
                         <p className="text-[10px] font-bold text-green-600 mt-0.5">Actif ✓</p>
+                        <button onClick={() => setEndModal(e)} className="text-[10px] text-red-500 hover:text-red-600 font-medium mt-0.5">Mettre fin</button>
                       </div>
                     </div>
                   )
@@ -725,6 +728,26 @@ export default function TutorDashboardPage() {
               <Link href="/abonnement" className="text-xs text-primary font-semibold hover:underline">Gérer</Link>
             </div>
           </div>
+
+          {/* Modale de résiliation */}
+          {endModal && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+                <h3 className="font-semibold text-gray-900 mb-2">Mettre fin au contrat ?</h3>
+                <p className="text-sm text-gray-500 mb-5">Ce contrat sera résilié et le parent en sera informé. Cette action est définitive.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setEndModal(null)} disabled={endLoading} className="btn-outline flex-1">Annuler</button>
+                  <button
+                    onClick={async () => { setEndLoading(true); const ok = await endEngagement(endModal.id, 'tutor'); setEndLoading(false); if (ok) setEndModal(null) }}
+                    disabled={endLoading}
+                    className="flex-1 bg-red-500 text-white font-semibold px-4 py-3 rounded-full hover:bg-red-600 disabled:opacity-60"
+                  >
+                    {endLoading ? 'Résiliation…' : 'Mettre fin'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Vérification */}
           <div className="card">

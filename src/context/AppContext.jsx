@@ -280,6 +280,32 @@ export function AppProvider({ children }) {
 
   useEffect(() => { loadLevelPackages() }, [loadLevelPackages])
 
+  // ── OFFRES DU RÉPÉTITEUR (tutor_offers) ─────────────────────
+  const loadTutorOffers = useCallback(async (tutorId) => {
+    const { data, error } = await supabase.from('tutor_offers').select('*').eq('tutor_id', tutorId)
+    if (error) { console.error('loadTutorOffers:', error); return [] }
+    return data.map(o => ({ id: o.id, levelKey: o.level_key, subjects: o.subjects || [], monthlyPrice: o.monthly_price, active: o.active }))
+  }, [])
+
+  // offers = [{ levelKey, subjects, monthlyPrice }] — synchronise l'ensemble.
+  const saveTutorOffers = useCallback(async (tutorId, offers) => {
+    const rows = offers.map(o => ({
+      tutor_id: tutorId, level_key: o.levelKey,
+      subjects: o.subjects || [], monthly_price: Number(o.monthlyPrice) || 0, active: true,
+    }))
+    if (rows.length > 0) {
+      const { error } = await supabase.from('tutor_offers').upsert(rows, { onConflict: 'tutor_id,level_key' })
+      if (error) { showToast('Erreur lors de l\'enregistrement des tarifs.', 'error'); return false }
+    }
+    // Supprimer les offres retirées (plus dans l'ensemble)
+    const keep = offers.map(o => o.levelKey)
+    let del = supabase.from('tutor_offers').delete().eq('tutor_id', tutorId)
+    if (keep.length > 0) del = del.not('level_key', 'in', `(${keep.join(',')})`)
+    await del
+    showToast('Tarifs enregistrés !')
+    return true
+  }, [showToast])
+
   const updateLevelPackage = useCallback(async (levelKey, patch) => {
     const dbPatch = {}
     if (patch.sessionsPerWeek != null) dbPatch.sessions_per_week = Number(patch.sessionsPerWeek)
@@ -1048,8 +1074,9 @@ export function AppProvider({ children }) {
       getTutor, getActiveTutors, getPendingTutors, reloadTutors,
       validateTutor, reviewDocument, updateTutorSubscription, suspendTutor, unsuspendTutor, updateTutorAvailability,
 
-      // Forfaits (refonte)
+      // Forfaits & offres (refonte)
       levelPackages, loadLevelPackages, updateLevelPackage,
+      loadTutorOffers, saveTutorOffers,
 
       // Conversations & messages
       getConversation, getUserConversations, getOrCreateConversation,

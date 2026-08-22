@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { CITIES, LEVELS } from '../data/constants'
 import { getDocumentApprovalProgress } from '../utils/helpers'
 import Avatar from '../components/common/Avatar'
+import OffersEditor from '../components/tutor/OffersEditor'
 import DashboardLayout from '../components/layout/DashboardLayout'
 import {
   User, Lock, Bell, Trash2, Save, Eye, EyeOff,
@@ -21,7 +22,7 @@ const DAY_LABELS = { lundi: 'Lun', mardi: 'Mar', mercredi: 'Mer', jeudi: 'Jeu', 
 // s'affichent correctement ici.
 const SLOTS = ['8h-10h', '10h-12h', '12h-14h', '14h-16h', '16h-18h', '18h-20h']
 
-const TABS_TUTOR = ['Profil', 'Documents', 'Disponibilités', 'Sécurité', 'Notifications']
+const TABS_TUTOR = ['Profil', 'Tarifs', 'Documents', 'Disponibilités', 'Sécurité', 'Notifications']
 const TABS_OTHER = ['Profil', 'Sécurité', 'Notifications']
 const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Admin' }
 
@@ -506,6 +507,13 @@ export default function SettingsPage() {
             )}
 
             {/* Documents tab (tutors only) */}
+            {activeTab === 'Tarifs' && currentUser?.role === 'tutor' && (
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 mb-4">Tarifs & offres par niveau</h2>
+                <OffersEditor />
+              </div>
+            )}
+
             {activeTab === 'Documents' && currentUser?.role === 'tutor' && (
               <div className="space-y-4">
 

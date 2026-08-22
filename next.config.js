@@ -35,4 +35,16 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+const { withSentryConfig } = require('@sentry/nextjs')
+
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  disableLogger: true,
+  // Pas d'upload de source maps sans token d'auth (évite tout échec de build).
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Route de tunnel pour contourner les bloqueurs de pub (optionnel).
+  tunnelRoute: '/monitoring',
+})

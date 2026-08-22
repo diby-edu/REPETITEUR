@@ -1,12 +1,13 @@
 'use client'
 import { useEffect } from 'react'
 import Link from 'next/link'
+import * as Sentry from '@sentry/nextjs'
 
 // Error Boundary global (App Router). Évite l'écran blanc « Application error »
-// et offre un point d'accroche pour un monitoring (Sentry, etc.).
+// et remonte l'erreur au monitoring (Sentry, inerte sans DSN).
 export default function Error({ error, reset }) {
   useEffect(() => {
-    // TODO monitoring : remonter l'erreur (Sentry.captureException(error))
+    Sentry.captureException(error)
     console.error('[app error boundary]', error)
   }, [error])
 

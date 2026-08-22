@@ -15,11 +15,13 @@ const DAY_ORDER = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 
 
 export default function TutorProfilePage() {
   const { id } = useParams()
-  const { getTutor, getTutorReviews, getOrCreateConversation, createBooking, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors, levelPackages } = useApp()
+  const { getTutor, getTutorReviews, getOrCreateConversation, createBooking, createEngagement, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors, levelPackages } = useApp()
   const { currentUser, isAuthenticated } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('profil')
   const [bookingForm, setBookingForm] = useState({ date: '', time: '', duration: '60', subject: '', location: 'domicile_parent', notes: '' })
+  const [subForm, setSubForm] = useState({ levelKey: '', schedule: '' })
+  const [subscribing, setSubscribing] = useState(false)
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
   const [respondingTo, setRespondingTo] = useState(null)
   const [response, setResponse] = useState('')
@@ -59,6 +61,25 @@ export default function TutorProfilePage() {
   const priceLabel = (tutor.priceMin && tutor.priceMax && tutor.priceMin !== tutor.priceMax)
     ? `${formatFCFA(tutor.priceMin)} – ${formatFCFA(tutor.priceMax)}`
     : formatFCFA(tutor.priceMin || tutor.monthlyRate || 0)
+  const selectedOffer = tutor.offers?.find(o => o.levelKey === subForm.levelKey)
+  const selectedPkg = levelPackages.find(p => p.levelKey === subForm.levelKey)
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault()
+    if (!isAuthenticated) { router.push('/connexion'); return }
+    if (!selectedOffer) { showToast('Choisissez un niveau.', 'error'); return }
+    setSubscribing(true)
+    const eng = await createEngagement({
+      parentId: currentUser.id,
+      tutorId: tutor.id,
+      levelKey: selectedOffer.levelKey,
+      subjects: selectedOffer.subjects,
+      monthlyRate: selectedOffer.monthlyPrice,
+      agreedSchedule: subForm.schedule,
+    })
+    setSubscribing(false)
+    if (eng) router.push('/reservations')
+  }
 
   const handleContact = async () => {
     if (!isAuthenticated) { router.push('/connexion'); return }
@@ -500,57 +521,54 @@ export default function TutorProfilePage() {
               )}
             </div>
 
-            {/* Quick booking form */}
-            {tutor.isActive && (
+            {/* Souscription à un contrat mensuel */}
+            {tutor.isActive && tutor.offers?.length > 0 && (!isAuthenticated || currentUser?.role === 'parent') && (
               <div className="card">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Calendar size={16} className="text-primary" />
-                  Réserver une séance
+                  Souscrire à un accompagnement
                 </h3>
-                <form onSubmit={handleBooking} className="space-y-3">
+                <form onSubmit={handleSubscribe} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Matière</label>
-                    <select className="input-field text-sm py-2" value={bookingForm.subject} onChange={e => setBookingForm(p => ({ ...p, subject: e.target.value }))} required>
-                      <option value="">Choisir</option>
-                      {tutor.subjects.map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-                    <input type="date" className="input-field text-sm py-2" value={bookingForm.date} onChange={e => setBookingForm(p => ({ ...p, date: e.target.value }))} required min={new Date().toISOString().split('T')[0]} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Heure</label>
-                    <input type="time" className="input-field text-sm py-2" value={bookingForm.time} onChange={e => setBookingForm(p => ({ ...p, time: e.target.value }))} required />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Durée</label>
-                    <select className="input-field text-sm py-2" value={bookingForm.duration} onChange={e => setBookingForm(p => ({ ...p, duration: e.target.value }))}>
-                      <option value="60">1 heure</option>
-                      <option value="90">1h30</option>
-                      <option value="120">2 heures</option>
-                      <option value="180">3 heures</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Lieu</label>
-                    <select className="input-field text-sm py-2" value={bookingForm.location} onChange={e => setBookingForm(p => ({ ...p, location: e.target.value }))}>
-                      {(tutor.modalities || MODALITIES.map(m => m.id)).map(m => {
-                        const found = MODALITIES.find(mo => mo.id === m)
-                        return <option key={m} value={m}>{found?.label || m}</option>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Niveau / classe</label>
+                    <select className="input-field text-sm py-2" value={subForm.levelKey} onChange={e => setSubForm(p => ({ ...p, levelKey: e.target.value }))} required>
+                      <option value="">Choisir un niveau</option>
+                      {tutor.offers.map(o => {
+                        const pkg = levelPackages.find(p => p.levelKey === o.levelKey)
+                        return <option key={o.levelKey} value={o.levelKey}>{(pkg?.label || o.levelKey)} — {formatFCFA(o.monthlyPrice)}/mois</option>
                       })}
                     </select>
                   </div>
+
+                  {selectedOffer && (
+                    <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
+                      {selectedPkg && <p>Forfait : <strong>{selectedPkg.sessionsPerWeek} séances/sem · {selectedPkg.hoursPerSession}h/séance · {selectedPkg.hoursPerMonth}h/mois</strong></p>}
+                      {selectedOffer.subjects?.length > 0 && <p>Matières : {selectedOffer.subjects.join(', ')}</p>}
+                      <p>Tarif : <strong className="text-primary">{formatFCFA(selectedOffer.monthlyPrice)}/mois</strong></p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Jours souhaités (à convenir avec le répétiteur)</label>
+                    <textarea className="input-field text-sm py-2 h-20 resize-none" placeholder="Ex. Lundi 17h-19h · Mercredi 17h-19h" value={subForm.schedule} onChange={e => setSubForm(p => ({ ...p, schedule: e.target.value }))} />
+                  </div>
+
                   {isAuthenticated ? (
-                    <button type="submit" className="btn-primary w-full text-sm">
-                      Envoyer la demande
+                    <button type="submit" disabled={subscribing} className="btn-primary w-full text-sm disabled:opacity-60">
+                      {subscribing ? 'Envoi…' : 'Souscrire'}
                     </button>
                   ) : (
                     <Link href="/connexion" className="btn-primary w-full text-sm text-center block">
-                      Se connecter pour réserver
+                      Se connecter pour souscrire
                     </Link>
                   )}
+                  <p className="text-[11px] text-gray-400 text-center">Le répétiteur devra accepter. Le paiement se fait en fin de mois, après les séances.</p>
                 </form>
+              </div>
+            )}
+            {tutor.isActive && (!tutor.offers || tutor.offers.length === 0) && (
+              <div className="card text-center py-6">
+                <p className="text-sm text-gray-400">Ce répétiteur n'a pas encore défini d'offre tarifaire.</p>
               </div>
             )}
 

@@ -52,7 +52,7 @@ export default function TutorDashboardPage() {
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
     respondToEngagement, confirmPayment,
-    runMaintenanceTasks, showToast,
+    runMaintenanceTasks, showToast, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
   const { setSlot } = useHeaderSlot()
@@ -465,11 +465,12 @@ export default function TutorDashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800">
-                        <span className="text-primary font-semibold">{e.subject}</span>
+                        <span className="text-primary font-semibold">{levelPackages.find(p => p.levelKey === e.levelKey)?.label || 'Contrat'}</span>
+                        {e.subject ? ` · ${e.subject}` : ''}
                         {par && ` — ${par.firstName} ${par.lastName}`}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatFCFA(e.monthlyRate)}/mois · Débute le {shortDate(e.startDate)}
+                        {formatFCFA(e.monthlyRate)}/mois · {e.agreedSchedule || `Débute le ${shortDate(e.startDate)}`}
                       </p>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">

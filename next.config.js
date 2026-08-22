@@ -8,7 +8,7 @@ const csp = [
   "img-src 'self' data: blob: https://*.supabase.co",
   "font-src 'self' data:",
   "media-src 'self' blob:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.paydunya.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.paydunya.com https://*.sentry.io",
   "frame-src https://app.paydunya.com",
   "object-src 'none'",
   "base-uri 'self'",
@@ -45,6 +45,6 @@ module.exports = withSentryConfig(nextConfig, {
   disableLogger: true,
   // Pas d'upload de source maps sans token d'auth (évite tout échec de build).
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
-  // Route de tunnel pour contourner les bloqueurs de pub (optionnel).
-  tunnelRoute: '/monitoring',
+  // Envoi direct vers Sentry (autorisé dans la CSP connect-src *.sentry.io).
+  // Pas de tunnelRoute : la route n'était pas générée (404) et bloquait l'envoi.
 })

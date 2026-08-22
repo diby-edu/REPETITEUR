@@ -738,24 +738,54 @@ export default function TutorDashboardPage() {
                 <span className="text-sm text-gray-500">Statut</span>
                 <StatusBadge status={tutor.verificationStatus} />
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">{tutor.documents?.idType === 'passport' ? 'Passeport' : 'CNI'}</span>
-                <span className={`text-sm font-medium ${hasId ? 'text-green-600' : 'text-red-500'}`}>
-                  {hasId ? '✓ Soumise' : '✗ Manquante'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Diplôme(s)</span>
-                <span className={`text-sm font-medium ${tutor.documents?.diplomes?.length ? 'text-green-600' : 'text-red-500'}`}>
-                  {tutor.documents?.diplomes?.length ? `✓ ${tutor.documents.diplomes.length} soumis` : '✗ Manquant'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Selfie avec pièce</span>
-                <span className={`text-sm font-medium ${tutor.documents?.selfiePath ? 'text-green-600' : 'text-red-500'}`}>
-                  {tutor.documents?.selfiePath ? '✓ Soumis' : '✗ Manquant'}
-                </span>
-              </div>
+              {(() => {
+                // Statut de validation par pièce (approuvé / en attente / rejeté).
+                const badge = (submitted, review) => {
+                  if (!submitted) return { t: '✗ Non soumis', c: 'text-red-500' }
+                  const s = review?.status
+                  if (s === 'approved') return { t: '✅ Approuvé', c: 'text-green-600' }
+                  if (s === 'rejected') return { t: '❌ Rejeté', c: 'text-red-500' }
+                  return { t: '⏳ En attente', c: 'text-amber-600' }
+                }
+                const docs = tutor.documents || {}
+                const isPassport = docs.idType === 'passport'
+                const idSubmitted = isPassport ? !!docs.passport : !!(docs.cniRecto && docs.cniVerso)
+                const idB = badge(idSubmitted, docs.idReview)
+                const selfieB = badge(!!docs.selfiePath, docs.selfieReview)
+                const diplomas = docs.diplomes || []
+                return (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">{isPassport ? 'Passeport' : 'CNI'}</span>
+                      <span className={`text-sm font-medium ${idB.c}`}>{idB.t}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Selfie avec pièce</span>
+                      <span className={`text-sm font-medium ${selfieB.c}`}>{selfieB.t}</span>
+                    </div>
+                    <div className="pt-1">
+                      <span className="text-sm text-gray-500">Diplômes ({diplomas.length})</span>
+                      {diplomas.length === 0 && <p className="text-xs text-red-500 mt-1">Aucun diplôme soumis</p>}
+                      <div className="mt-1 space-y-1">
+                        {diplomas.map((d, i) => {
+                          const b = badge(!!d.path, d.review)
+                          return (
+                            <div key={i} className="flex justify-between items-center gap-2">
+                              <span className="text-xs text-gray-600 truncate">{d.name || `Diplôme ${i + 1}`}</span>
+                              <span className={`text-xs font-medium whitespace-nowrap ${b.c}`}>{b.t}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {tutor.verificationStatus === 'rejected' && tutor.rejectionReason && (
+                      <div className="bg-red-50 rounded-xl p-3">
+                        <p className="text-xs text-red-700"><strong>Motif du rejet :</strong> {tutor.rejectionReason}</p>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
               {isVerified && (
                 <div className="bg-green-50 rounded-xl p-3 flex items-center gap-2">
                   <CheckCircle size={16} className="text-green-500" />

@@ -230,6 +230,7 @@ export default function AdminDashboardPage() {
   const [subPlan, setSubPlan]               = useState('standard')
   const [subMonths, setSubMonths]           = useState(1)
   const [subBusy, setSubBusy]               = useState(false)
+  const [reopenedId, setReopenedId]         = useState(null)   // dossier traité rouvert pour re-revue
   const [userFilter, setUserFilter]         = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')   // 'all' | 'tutor' | 'parent'
   const [userStatusFilter, setUserStatusFilter] = useState('all') // 'all' | 'verified' | 'pending' | 'rejected'
@@ -480,6 +481,11 @@ export default function AdminDashboardPage() {
   const pending  = tutors.filter(t => t.verificationStatus === 'pending')
   const verified = tutors.filter(t => t.verificationStatus === 'verified')
   const rejected = tutors.filter(t => t.verificationStatus === 'rejected')
+  // Dossier traité rouvert pour re-consultation/re-décision (toujours frais).
+  const reopenedTutor = reopenedId ? tutors.find(t => t.id === reopenedId) : null
+  const dossiersToReview = reopenedTutor && !pending.some(t => t.id === reopenedId)
+    ? [reopenedTutor, ...pending]
+    : pending
   const premiumSubs  = tutors.filter(t => t.subscription?.plan === 'premium'  && t.subscription?.status === 'active')
   const standardSubs = tutors.filter(t => t.subscription?.plan === 'standard' && t.subscription?.status === 'active')
   const activeSubscriptions = tutors.filter(t => t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
@@ -882,14 +888,22 @@ export default function AdminDashboardPage() {
         {activeTab === 'Vérifications' && (
           <div className="space-y-4">
             <h3 className="font-semibold text-gray-700">Dossiers en attente ({pending.length})</h3>
-            {pending.length === 0 && (
+            {reopenedTutor && (
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-2">
+                <p className="text-sm text-blue-700">
+                  Dossier rouvert : <strong>{reopenedTutor.firstName} {reopenedTutor.lastName}</strong> — vous pouvez re-consulter et re-statuer chaque pièce.
+                </p>
+                <button onClick={() => setReopenedId(null)} className="text-blue-500 hover:text-blue-700 text-sm font-medium">Fermer</button>
+              </div>
+            )}
+            {dossiersToReview.length === 0 && (
               <div className="card text-center py-12">
                 <CheckCircle size={48} className="text-green-300 mx-auto mb-4" />
                 <p className="text-gray-500 font-medium">Aucun dossier en attente</p>
                 <p className="text-gray-400 text-sm">Tous les dossiers ont été traités !</p>
               </div>
             )}
-            {pending.map(tutor => {
+            {dossiersToReview.map(tutor => {
               const docs = tutor.documents || {}
               const isPassport = docs.idType === 'passport'
               const idSubmitted = isPassport ? !!docs.passport : !!(docs.cniRecto && docs.cniVerso)
@@ -903,7 +917,7 @@ export default function AdminDashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-semibold text-gray-900">{tutor.firstName} {tutor.lastName}</h4>
-                        <StatusBadge status="pending" />
+                        <StatusBadge status={tutor.verificationStatus} />
                       </div>
                       <p className="text-sm text-gray-500">{tutor.email} — {tutor.city}</p>
                       <p className="text-sm text-gray-600 mt-1">
@@ -979,14 +993,19 @@ export default function AdminDashboardPage() {
                 <h3 className="font-semibold text-gray-700 mt-6">Dossiers traités récemment</h3>
                 <div className="space-y-3">
                   {[...verified, ...rejected].slice(0, 5).map(tutor => (
-                    <div key={tutor.id} className="card flex items-center gap-4">
+                    <button
+                      key={tutor.id}
+                      onClick={() => { setReopenedId(tutor.id); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                      className="w-full text-left card flex items-center gap-4 hover:border-primary hover:shadow-md transition-all"
+                    >
                       <Avatar user={tutor} size="md" />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-800">{tutor.firstName} {tutor.lastName}</p>
-                        <p className="text-xs text-gray-500">{tutor.city} — {tutor.subjects.join(', ')}</p>
+                        <p className="text-xs text-gray-500 truncate">{tutor.city} — {tutor.subjects.join(', ')}</p>
                       </div>
                       <StatusBadge status={tutor.verificationStatus} />
-                    </div>
+                      <span className="text-xs text-primary font-semibold flex-shrink-0 whitespace-nowrap">Rouvrir →</span>
+                    </button>
                   ))}
                 </div>
               </>

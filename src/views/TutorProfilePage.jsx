@@ -225,17 +225,17 @@ export default function TutorProfilePage() {
                   </div>
                 )}
 
-                {tutor.documents?.diplomes?.length > 0 && (
+                {tutor.diplomaNames?.length > 0 && (
                   <div className="card">
                     <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <CheckCircle size={16} className="text-secondary" />
                       Diplômes vérifiés
                     </h2>
                     <ul className="space-y-2">
-                      {tutor.documents.diplomes.map((d, i) => (
+                      {tutor.diplomaNames.map((name, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
                           <div className="w-1.5 h-1.5 bg-secondary rounded-full" />
-                          {typeof d === 'string' ? d : (d?.name || 'Diplôme')}
+                          {name}
                         </li>
                       ))}
                     </ul>

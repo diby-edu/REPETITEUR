@@ -44,7 +44,7 @@ export default function ChatBubble() {
     const tutor = getTutor(otherId)
     if (tutor) { setOtherUserCache(prev => ({ ...prev, [otherId]: tutor })); return }
     const { data } = await supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('id, first_name, last_name, role, avatar_color')
       .eq('id', otherId)
       .single()

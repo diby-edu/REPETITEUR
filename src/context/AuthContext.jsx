@@ -66,11 +66,19 @@ export function AuthProvider({ children }) {
 
   // Initialisation : récupérer la session existante
   useEffect(() => {
+    // Filet de sécurité : si Supabase est lent/injoignable, on ne reste pas
+    // bloqué indéfiniment sur l'écran « Chargement… » — on rend l'app (déconnecté).
+    const safety = setTimeout(() => setLoading(false), 6000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
         setCurrentUser(profile)
       }
+    }).catch((err) => {
+      console.error('[auth] getSession a échoué:', err)
+    }).finally(() => {
+      clearTimeout(safety)
       setLoading(false)
     })
 
@@ -84,7 +92,7 @@ export function AuthProvider({ children }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => { clearTimeout(safety); subscription.unsubscribe() }
   }, [])
 
   const login = async (email, password) => {

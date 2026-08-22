@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
 import { filterPhoneAndEmail } from '../utils/helpers'
 import { deriveDocumentsStatus, buildRejectionReason, computeIsActive } from '../utils/verification'
 
@@ -41,6 +42,45 @@ function mapTutor(profile, tutor) {
     monthlyRequests: tutor.monthly_requests || 0,
     isActive: tutor.is_active,
     suspended: tutor.suspended,
+  }
+}
+
+// Mappe une ligne de la vue publique `public_tutors` (colonnes vitrine,
+// SANS email/téléphone/documents KYC) vers la même forme que mapTutor.
+function mapPublicTutor(r) {
+  return {
+    id: r.id,
+    role: 'tutor',
+    firstName: r.first_name,
+    lastName: r.last_name,
+    email: undefined,
+    phone: undefined,
+    city: r.city,
+    quartier: r.quartier,
+    avatarColor: r.avatar_color,
+    joinDate: r.join_date,
+    bio: r.bio,
+    subjects: r.subjects || [],
+    levels: r.levels || [],
+    monthlyRate: r.monthly_rate,
+    modalities: r.modalities || [],
+    availability: r.availability || {},
+    verificationStatus: r.verification_status,
+    rejectionReason: r.rejection_reason,
+    documents: {},
+    subscription: {
+      plan: r.subscription_plan,
+      startDate: r.subscription_start,
+      endDate: r.subscription_end,
+      status: r.subscription_status,
+    },
+    rating: parseFloat(r.rating) || 0,
+    reviewCount: r.review_count || 0,
+    sessionCount: r.session_count || 0,
+    profileViews: r.profile_views || 0,
+    monthlyRequests: r.monthly_requests || 0,
+    isActive: r.is_active,
+    suspended: r.suspended,
   }
 }
 
@@ -172,6 +212,7 @@ function mapPayment(row) {
 // ── Provider ─────────────────────────────────────────────────
 
 export function AppProvider({ children }) {
+  const { currentUser } = useAuth()
   const [tutors, setTutors] = useState([])
   const [conversations, setConversations] = useState([])
   const [bookings, setBookings] = useState([])
@@ -193,15 +234,22 @@ export function AppProvider({ children }) {
   // ── TUTEURS ─────────────────────────────────────────────────
 
   const reloadTutors = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, tutors(*)')
-      .eq('role', 'tutor')
-      .not('tutors', 'is', null)
-
-    if (error) { console.error('loadTutors:', error); return }
-    setTutors(data.map(p => mapTutor(p, p.tutors)))
-  }, [])
+    // L'admin lit les lignes complètes (documents KYC + email requis pour la
+    // vérification) ; tout le monde passe par la vue publique sans PII.
+    if (currentUser?.role === 'admin') {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, tutors(*)')
+        .eq('role', 'tutor')
+        .not('tutors', 'is', null)
+      if (error) { console.error('loadTutors:', error); return }
+      setTutors(data.map(p => mapTutor(p, p.tutors)))
+    } else {
+      const { data, error } = await supabase.from('public_tutors').select('*')
+      if (error) { console.error('loadTutors:', error); return }
+      setTutors(data.map(mapPublicTutor))
+    }
+  }, [currentUser?.role])
 
   useEffect(() => { reloadTutors() }, [reloadTutors])
 
@@ -621,11 +669,16 @@ export function AppProvider({ children }) {
 
   const getParent = async (id) => {
     if (profiles[id]) return profiles[id]
-    const { data } = await supabase.from('profiles').select('*').eq('id', id).single()
+    // Vue publique : pas d'email/téléphone d'un autre utilisateur.
+    const { data } = await supabase
+      .from('public_profiles')
+      .select('id, first_name, last_name, avatar_color, city')
+      .eq('id', id)
+      .single()
     if (data) {
       const profile = {
         id: data.id, firstName: data.first_name, lastName: data.last_name,
-        email: data.email, avatarColor: data.avatar_color,
+        avatarColor: data.avatar_color, city: data.city,
       }
       setProfiles(prev => ({ ...prev, [id]: profile }))
       return profile

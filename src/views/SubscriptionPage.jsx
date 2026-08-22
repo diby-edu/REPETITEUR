@@ -163,14 +163,18 @@ export default function SubscriptionPage() {
                   <h3 className="font-display font-bold text-xl text-gray-900">Plan {sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1)}</h3>
                   <StatusBadge status={sub.status} />
                 </div>
-                {sub.status === 'active' && (
+                {sub.plan === 'gratuit' ? (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Plan gratuit — passez à un plan payant pour être visible dans les recherches.
+                  </p>
+                ) : sub.status === 'active' && sub.endDate && (
                   <p className="text-sm text-gray-500 mt-1">
                     Expire le <span className="font-semibold text-gray-700">{formatDateShort(sub.endDate)}</span>
                     {' '}(<span className={daysLeft <= 5 ? 'text-red-500 font-semibold' : 'text-gray-600'}>{daysLeft} jours restants</span>)
                   </p>
                 )}
               </div>
-              {daysLeft <= 10 && sub.status === 'active' && (
+              {sub.plan !== 'gratuit' && daysLeft <= 10 && sub.status === 'active' && (
                 <div className="flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 px-3 py-2 rounded-xl">
                   <Zap size={14} />
                   Renouvelez bientôt pour rester visible

@@ -106,29 +106,28 @@ export default function ParentDashboardPage() {
   useEffect(() => {
     if (!parent?.city) return
     supabase
-      .from('profiles')
-      .select('id, first_name, last_name, city, avatar_color, tutors(subjects, levels, monthly_rate, rating, is_active, verification_status)')
-      .eq('role', 'tutor')
+      .from('public_tutors')
+      .select('id, first_name, last_name, city, avatar_color, subjects, levels, monthly_rate, rating, is_active, verification_status')
       .eq('city', parent.city)
       .order('join_date', { ascending: false })
       .limit(20)
       .then(({ data }) => {
         if (!data) return
-        let list = data.filter(p => p.tutors?.is_active && p.tutors?.verification_status === 'verified')
+        let list = data.filter(t => t.is_active && t.verification_status === 'verified')
         if (parent.subjectsNeeded?.length) {
-          list = list.filter(t => !t.tutors?.subjects?.length || t.tutors.subjects.some(s => parent.subjectsNeeded.includes(s)))
+          list = list.filter(t => !t.subjects?.length || t.subjects.some(s => parent.subjectsNeeded.includes(s)))
         }
-        list.sort((a, b) => (b.tutors?.rating || 0) - (a.tutors?.rating || 0))
-        setMatchingTutors(list.slice(0, 12).map(p => ({
-          id: p.id,
-          firstName: p.first_name,
-          lastName: p.last_name,
-          city: p.city,
-          avatarColor: p.avatar_color,
-          subjects: p.tutors?.subjects || [],
-          levels: p.tutors?.levels || [],
-          monthlyRate: p.tutors?.monthly_rate,
-          rating: p.tutors?.rating,
+        list.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        setMatchingTutors(list.slice(0, 12).map(t => ({
+          id: t.id,
+          firstName: t.first_name,
+          lastName: t.last_name,
+          city: t.city,
+          avatarColor: t.avatar_color,
+          subjects: t.subjects || [],
+          levels: t.levels || [],
+          monthlyRate: t.monthly_rate,
+          rating: t.rating,
         })))
       })
   }, [parent?.city])

@@ -55,7 +55,7 @@ export default function BookingPage() {
     <div className="bg-surface">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <h1 className="font-display text-2xl font-bold text-gray-900 mb-6">
-          Mes réservations
+          Mes séances
         </h1>
 
         {/* Cancel modal */}

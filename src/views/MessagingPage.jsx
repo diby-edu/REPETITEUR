@@ -96,8 +96,12 @@ export default function MessagingPage() {
       return tutor
     }
 
-    // Charger depuis DB si pas dans les tuteurs
-    const { data } = await supabase.from('profiles').select('*').eq('id', otherId).single()
+    // Charger depuis DB si pas dans les tuteurs (vue publique — pas de PII)
+    const { data } = await supabase
+      .from('public_profiles')
+      .select('id, first_name, last_name, role, city, avatar_color')
+      .eq('id', otherId)
+      .single()
     if (data) {
       const profile = {
         id: data.id,

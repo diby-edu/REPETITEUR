@@ -108,7 +108,7 @@ export default function TutorDashboardPage() {
   useEffect(() => {
     if (!tutor?.city) return
     supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('id, first_name, last_name, city, avatar_color, subjects_needed, child_levels, join_date')
       .eq('role', 'parent')
       .eq('open_to_contact', true)
@@ -145,7 +145,7 @@ export default function TutorDashboardPage() {
     const unknownIds = [...new Set(engagements.map(e => e.parentId).filter(id => id && !parentProfiles[id]))]
     if (unknownIds.length === 0) return
     supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('id, first_name, last_name, avatar_color')
       .in('id', unknownIds)
       .then(({ data }) => {
@@ -165,7 +165,7 @@ export default function TutorDashboardPage() {
     if (unknownIds.length === 0) return
     unknownIds.forEach(id => fetchedPartnerIds.current.add(id))
     supabase
-      .from('profiles')
+      .from('public_profiles')
       .select('id, first_name, last_name, avatar_color')
       .in('id', [...new Set(unknownIds)])
       .then(({ data }) => {
@@ -511,7 +511,13 @@ export default function TutorDashboardPage() {
             </p>
           </div>
 
-          {matchingParents.length === 0 ? (
+          {!isVerified ? (
+            <div className="card text-center py-8">
+              <Users size={36} className="text-gray-200 mx-auto mb-3" />
+              <p className="text-sm text-gray-500 font-medium">Disponible après vérification de votre profil</p>
+              <p className="text-xs text-gray-400 mt-1">Les coordonnées des parents sont réservées aux répétiteurs vérifiés.</p>
+            </div>
+          ) : matchingParents.length === 0 ? (
             <div className="card text-center py-8">
               <Users size={36} className="text-gray-200 mx-auto mb-3" />
               <p className="text-sm text-gray-400">Aucun parent dans votre ville n'a encore activé le contact répétiteur.</p>

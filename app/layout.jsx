@@ -15,9 +15,33 @@ const poppins = Poppins({
   display: 'swap',
 })
 
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL?.startsWith('http')
+  ? process.env.NEXT_PUBLIC_APP_URL
+  : 'https://repetiteur.numerik360.com'
+
 export const metadata = {
-  title: "MonRépétiteur — Trouvez le meilleur répétiteur en Côte d'Ivoire",
-  description: "Plateforme de mise en relation entre répétiteurs et familles en Côte d'Ivoire",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "MonRépétiteur — Trouvez le meilleur répétiteur en Côte d'Ivoire",
+    template: '%s — MonRépétiteur',
+  },
+  description: "Plateforme de mise en relation entre répétiteurs qualifiés et vérifiés et familles en Côte d'Ivoire. Trouvez un répétiteur près de chez vous.",
+  applicationName: 'MonRépétiteur',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    locale: 'fr_FR',
+    url: SITE_URL,
+    siteName: 'MonRépétiteur',
+    title: "MonRépétiteur — Trouvez le meilleur répétiteur en Côte d'Ivoire",
+    description: "Répétiteurs qualifiés et vérifiés près de chez vous en Côte d'Ivoire.",
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "MonRépétiteur — Trouvez le meilleur répétiteur en Côte d'Ivoire",
+    description: "Répétiteurs qualifiés et vérifiés près de chez vous en Côte d'Ivoire.",
+  },
+  robots: { index: true, follow: true },
 }
 
 export default function RootLayout({ children }) {

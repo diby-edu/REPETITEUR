@@ -986,7 +986,10 @@ export default function AdminDashboardPage() {
                     {user.role === 'tutor' && (
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={user.verificationStatus} />
-                        <StatusBadge status={user.subscription?.status || 'inactive'} />
+                        {/* Visibilité réelle en recherche (is_active), pas le statut d'abonnement */}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${user.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {user.isActive ? 'Visible' : 'Non visible'}
+                        </span>
                       </div>
                     )}
                   </div>

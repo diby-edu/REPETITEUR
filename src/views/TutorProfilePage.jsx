@@ -235,7 +235,7 @@ export default function TutorProfilePage() {
                       {tutor.documents.diplomes.map((d, i) => (
                         <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
                           <div className="w-1.5 h-1.5 bg-secondary rounded-full" />
-                          {d}
+                          {typeof d === 'string' ? d : (d?.name || 'Diplôme')}
                         </li>
                       ))}
                     </ul>

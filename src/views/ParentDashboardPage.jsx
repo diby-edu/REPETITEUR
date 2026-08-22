@@ -70,8 +70,9 @@ export default function ParentDashboardPage() {
   const [ratingComment, setRatingComment] = useState('')
   const [reportConfirm, setReportConfirm] = useState(false)
   const [reportLoading, setReportLoading] = useState(false)
-  const [endModal, setEndModal]           = useState(null)   // contrat à résilier
+  const [endModal, setEndModal]           = useState(null)   // contrat à résilier / demande à annuler
   const [endLoading, setEndLoading]       = useState(false)
+  const [confirmedPayments, setConfirmedPayments] = useState([])
 
   // ── Répétiteurs disponibles ─────────────────────────────────
   const [matchingTutors, setMatchingTutors] = useState([])
@@ -102,6 +103,17 @@ export default function ParentDashboardPage() {
     loadUserNotifications(parent.id)
     runMaintenanceTasks()
     return subscribeToNotifications(parent.id)
+  }, [parent?.id])
+
+  // Paiements confirmés (dépenses réelles — postpayé)
+  useEffect(() => {
+    if (!parent?.id) return
+    supabase
+      .from('payments')
+      .select('amount, tutor_confirmed_at, engagement:engagements!inner(parent_id, monthly_rate)')
+      .eq('engagement.parent_id', parent.id)
+      .eq('status', 'confirmed')
+      .then(({ data }) => { if (data) setConfirmedPayments(data) })
   }, [parent?.id])
 
   // Répétiteurs vérifiés dans la même ville
@@ -161,21 +173,24 @@ export default function ParentDashboardPage() {
 
   const upcomingSessions  = allSessions.filter(s => !isDatePast(s.scheduledDate))
   const currentMonth      = new Date().toISOString().slice(0, 7)
-  const sessionsThisMonth = allSessions.filter(s => s.scheduledDate?.startsWith(currentMonth))
-  const monthlySpend      = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
+  // Séances = validées par le parent (compteur) + total du forfait.
+  const sessionsDoneTotal   = activeEngagements.reduce((s, e) => s + (e.sessionsDone || 0), 0)
+  const sessionsTargetTotal = activeEngagements.reduce((s, e) => {
+    const pkg = levelPackages.find(p => p.levelKey === e.levelKey)
+    return s + (pkg ? pkg.sessionsPerWeek * 4 : 0)
+  }, 0)
+  // Dépenses = paiements CONFIRMÉS ce mois (postpayé), pas le tarif des contrats.
+  const confirmedSpend    = confirmedPayments
+    .filter(p => (p.tutor_confirmed_at || '').slice(0, 7) === currentMonth)
+    .reduce((sum, p) => sum + (p.amount || p.engagement?.monthly_rate || 0), 0)
+  const expectedSpend     = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
   const favoriteIds       = new Set(favoriteTutors.map(t => t.id))
-
-  // Sessions this month per engagement (for improved contracts section)
-  const sessionsPerEng = {}
-  sessionsThisMonth.forEach(s => {
-    sessionsPerEng[s.engagementId] = (sessionsPerEng[s.engagementId] || 0) + 1
-  })
 
   const stats = [
     { label: 'Séances planifiées',  value: upcomingSessions.length,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: upcomingSessions.length > 0 ? '↑ à venir' : '→ stable',       deltaClass: upcomingSessions.length > 0 ? 'text-green-600' : 'text-gray-400' },
     { label: 'Contrats actifs',     value: activeEngagements.length,  emoji: '📋', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                                    deltaClass: 'text-gray-400' },
-    { label: 'Séances ce mois',     value: sessionsThisMonth.length,  emoji: '📚', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionsToReport.length > 0 ? `${sessionsToReport.length} à confirmer` : '→ stable', deltaClass: sessionsToReport.length > 0 ? 'text-orange-500' : 'text-gray-400' },
-    { label: 'Dépenses FCFA (mois)', value: monthlySpend > 0 ? monthlySpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: monthlySpend >= 100000, delta: monthlySpend > 0 ? '↑ contrats actifs' : '→ stable', deltaClass: monthlySpend > 0 ? 'text-orange-500' : 'text-gray-400' },
+    { label: 'Séances validées',    value: sessionsTargetTotal > 0 ? `${sessionsDoneTotal}/${sessionsTargetTotal}` : '0', emoji: '📚', bg: 'bg-blue-50', bar: 'bg-blue-500', delta: sessionsTargetTotal > 0 ? 'à cocher au fil du mois' : '→ stable', deltaClass: 'text-gray-400' },
+    { label: 'Dépenses FCFA (mois)', value: confirmedSpend > 0 ? confirmedSpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: confirmedSpend >= 100000, delta: paymentDueEngagements.length > 0 ? `${paymentDueEngagements.length} règlement${paymentDueEngagements.length > 1 ? 's' : ''} à venir` : expectedSpend > 0 ? `À régler ce mois : ${expectedSpend.toLocaleString('fr-FR')} FCFA` : '→ stable', deltaClass: paymentDueEngagements.length > 0 ? 'text-orange-500' : 'text-gray-400' },
   ]
 
   // ── Handlers ────────────────────────────────────────────────
@@ -411,33 +426,30 @@ export default function ParentDashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                 <Calendar size={18} className="text-primary" />
-                Cette semaine
+                Ce mois-ci
               </h2>
             </div>
-            {thisWeekSessions.length === 0 ? (
+            {activeEngagements.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar size={36} className="text-gray-200 mx-auto mb-3" />
-                <p className="text-sm text-gray-400">Aucune séance cette semaine</p>
-                {activeEngagements.length === 0 && (
-                  <Link href="/recherche" className="text-xs text-primary font-medium mt-2 block hover:underline">
-                    Trouver un répétiteur →
-                  </Link>
-                )}
+                <p className="text-sm text-gray-400">Aucun contrat en cours</p>
+                <Link href="/recherche" className="text-xs text-primary font-medium mt-2 block hover:underline">
+                  Trouver un répétiteur →
+                </Link>
               </div>
             ) : (
               <div className="space-y-2">
-                {thisWeekSessions.map(s => {
-                  const eng = engagements.find(e => e.id === s.engagementId)
-                  const t = eng ? getTutor(eng.tutorId) : null
+                {activeEngagements.map(e => {
+                  const t = getTutor(e.tutorId)
+                  const pkg = levelPackages.find(p => p.levelKey === e.levelKey)
+                  const total = pkg ? pkg.sessionsPerWeek * 4 : 0
+                  const days = daysUntil(e.endDate)
                   return (
-                    <div key={s.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className="w-10 h-10 bg-primary-50 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-primary leading-none">{s.scheduledDate.split('-')[2]}</span>
-                        <span className="text-xs text-primary/60 leading-none">{MONTHS_FR[parseInt(s.scheduledDate.split('-')[1]) - 1]}</span>
-                      </div>
+                    <div key={e.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <Avatar user={t} size="sm" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800">{eng?.subject}</p>
-                        <p className="text-xs text-gray-500">{t?.firstName} {t?.lastName} · {s.scheduledTime?.slice(0, 5)}</p>
+                        <p className="text-sm font-medium text-gray-800 truncate">{t?.firstName} {t?.lastName}</p>
+                        <p className="text-xs text-gray-500">{e.sessionsDone}/{total} séances validées{days >= 0 && days <= 7 ? ` · règlement dans ${days} j` : ''}</p>
                       </div>
                     </div>
                   )
@@ -515,6 +527,9 @@ export default function ParentDashboardPage() {
                         {e.status === 'active' && (
                           <button onClick={() => setEndModal(e)} className="text-[11px] text-red-500 hover:text-red-600 font-medium">Mettre fin</button>
                         )}
+                        {e.status === 'pending' && (
+                          <button onClick={() => setEndModal(e)} className="text-[11px] text-red-500 hover:text-red-600 font-medium">Annuler</button>
+                        )}
                       </div>
                     </div>
                   )
@@ -527,8 +542,10 @@ export default function ParentDashboardPage() {
           {endModal && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
-                <h3 className="font-semibold text-gray-900 mb-2">Mettre fin au contrat ?</h3>
-                <p className="text-sm text-gray-500 mb-5">Le contrat avec ce répétiteur sera résilié. Le répétiteur en sera informé. Cette action est définitive.</p>
+                <h3 className="font-semibold text-gray-900 mb-2">{endModal.status === 'pending' ? 'Annuler la demande ?' : 'Mettre fin au contrat ?'}</h3>
+                <p className="text-sm text-gray-500 mb-5">{endModal.status === 'pending'
+                  ? 'Votre demande de contrat sera annulée. Vous pourrez en soumettre une nouvelle (autre niveau, autres jours).'
+                  : 'Le contrat avec ce répétiteur sera résilié. Le répétiteur en sera informé. Cette action est définitive.'}</p>
                 <div className="flex gap-3">
                   <button onClick={() => setEndModal(null)} disabled={endLoading} className="btn-outline flex-1">Annuler</button>
                   <button
@@ -536,7 +553,7 @@ export default function ParentDashboardPage() {
                     disabled={endLoading}
                     className="flex-1 bg-red-500 text-white font-semibold px-4 py-3 rounded-full hover:bg-red-600 disabled:opacity-60"
                   >
-                    {endLoading ? 'Résiliation…' : 'Mettre fin'}
+                    {endLoading ? '…' : (endModal.status === 'pending' ? 'Annuler la demande' : 'Mettre fin')}
                   </button>
                 </div>
               </div>

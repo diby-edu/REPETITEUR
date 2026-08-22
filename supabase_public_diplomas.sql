@@ -15,11 +15,13 @@ create or replace view public.public_tutors as
     t.subscription_plan, t.subscription_start, t.subscription_end, t.subscription_status,
     t.rating, t.review_count, t.session_count, t.profile_views, t.monthly_requests,
     t.is_active, t.suspended,
-    -- Noms des diplômes APPROUVÉS uniquement (pas de chemins de fichiers)
+    -- Noms des diplômes d'un tuteur VÉRIFIÉ uniquement (pas de chemins de
+    -- fichiers). Un tuteur vérifié a forcément ses diplômes validés — ça couvre
+    -- aussi les tuteurs vérifiés avant le flux de revue pièce par pièce.
     (
       select coalesce(array_agg(d->>'name'), '{}'::text[])
       from jsonb_array_elements(coalesce(t.documents->'diplomes', '[]'::jsonb)) d
-      where coalesce(d->'review'->>'status', '') = 'approved'
+      where t.verification_status = 'verified'
         and (d->>'name') is not null
     ) as diploma_names
   from public.profiles p

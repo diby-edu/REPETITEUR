@@ -42,9 +42,9 @@ function mapTutor(profile, tutor) {
     monthlyRequests: tutor.monthly_requests || 0,
     isActive: tutor.is_active,
     suspended: tutor.suspended,
-    diplomaNames: (tutor.documents?.diplomes || [])
-      .filter(d => d?.review?.status === 'approved' && d?.name)
-      .map(d => d.name),
+    diplomaNames: tutor.verification_status === 'verified'
+      ? (tutor.documents?.diplomes || []).map(d => d?.name).filter(Boolean)
+      : [],
   }
 }
 

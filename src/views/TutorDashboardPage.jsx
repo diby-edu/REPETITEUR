@@ -72,6 +72,7 @@ export default function TutorDashboardPage() {
   const [conversationPartners, setConversationPartners] = useState({})
   const [parentProfiles, setParentProfiles]         = useState({})
   const [pendingPayments, setPendingPayments]       = useState([])
+  const [confirmedPayments, setConfirmedPayments]   = useState([])
   const [endModal, setEndModal]                     = useState(null)   // contrat à résilier
   const [endLoading, setEndLoading]                 = useState(false)
   const [contactingId, setContactingId]             = useState(null)
@@ -137,8 +138,12 @@ export default function TutorDashboardPage() {
       .from('payments')
       .select('*, engagement:engagements!inner(id, subject, parent_id, monthly_rate, start_date, end_date, tutor_id)')
       .eq('engagement.tutor_id', tutor.id)
-      .eq('status', 'parent_declared')
-      .then(({ data }) => { if (data) setPendingPayments(data) })
+      .in('status', ['parent_declared', 'confirmed'])
+      .then(({ data }) => {
+        if (!data) return
+        setPendingPayments(data.filter(p => p.status === 'parent_declared'))
+        setConfirmedPayments(data.filter(p => p.status === 'confirmed'))
+      })
   }, [tutor?.id])
 
   // Profils des parents pour les engagements
@@ -218,7 +223,12 @@ export default function TutorDashboardPage() {
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''))
     .slice(0, 5)
   const currentMonth      = new Date().toISOString().slice(0, 7)
-  const monthSessionCount = allSessions.filter(s => s.scheduledDate?.startsWith(currentMonth)).length
+  // Séances = validées par le parent (compteur), plus de séances datées.
+  const monthSessionsDone  = activeEngagements.reduce((s, e) => s + (e.sessionsDone || 0), 0)
+  const monthSessionsTotal = activeEngagements.reduce((s, e) => {
+    const pkg = levelPackages.find(p => p.levelKey === e.levelKey)
+    return s + (pkg ? pkg.sessionsPerWeek * 4 : 0)
+  }, 0)
   const unreadMessages    = conversations.reduce((sum, c) => sum + (c.unreadCount?.[tutor?.id] || 0), 0)
   const daysLeft          = getSubscriptionDaysLeft(tutor.subscription?.endDate)
   const isSubscriptionActive = tutor.subscription?.status === 'active'
@@ -226,14 +236,12 @@ export default function TutorDashboardPage() {
   const isPremium         = tutor.subscription?.plan === 'premium'
   const hasId             = tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni
 
-  const monthlyRevenue    = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
+  // Revenu = paiements CONFIRMÉS ce mois (postpayé). L'attendu = contrats actifs.
+  const expectedRevenue   = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
   const pendingRevenue    = pendingPayments.reduce((sum, p) => sum + (p.amount || p.engagement?.monthly_rate || 0), 0)
-  const confirmedRevenue  = monthlyRevenue - pendingRevenue
-
-  // Delta vs mois précédent (calculé à partir de allSessions déjà chargés)
-  const prevMonthStr          = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().slice(0, 7)
-  const prevMonthSessionCount = allSessions.filter(s => s.scheduledDate?.startsWith(prevMonthStr)).length
-  const sessionDelta          = monthSessionCount - prevMonthSessionCount
+  const confirmedRevenue  = confirmedPayments
+    .filter(p => (p.tutor_confirmed_at || '').slice(0, 7) === currentMonth)
+    .reduce((sum, p) => sum + (p.amount || p.engagement?.monthly_rate || 0), 0)
 
   // Profil completion score (5 champs = 20% each)
   const profileChecks = [
@@ -248,18 +256,16 @@ export default function TutorDashboardPage() {
 
   const stats = [
     {
-      label: 'Séances ce mois', value: monthSessionCount, emoji: '📅',
+      label: 'Séances validées (mois)', value: monthSessionsTotal > 0 ? `${monthSessionsDone}/${monthSessionsTotal}` : '0', emoji: '📅',
       bg: 'bg-secondary-50', bar: 'bg-secondary',
-      delta: sessionDelta > 0 ? `↑ +${sessionDelta} vs mois dernier` : sessionDelta < 0 ? `↓ ${sessionDelta} vs mois dernier` : '→ stable vs mois dernier',
-      deltaClass: sessionDelta > 0 ? 'text-green-600' : sessionDelta < 0 ? 'text-red-500' : 'text-gray-400',
+      delta: monthSessionsTotal > 0 ? 'validées par les parents' : '→ stable',
+      deltaClass: 'text-gray-400',
     },
     {
-      label: 'Revenus FCFA (mois)', value: monthlyRevenue > 0 ? monthlyRevenue.toLocaleString('fr-FR') : '0',
-      emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: monthlyRevenue >= 100000,
-      subValue: pendingRevenue > 0 ? `✓ Confirmés : ${formatFCFA(confirmedRevenue)}` : null,
-      subClass: 'text-green-600',
-      delta: pendingRevenue > 0 ? `⏳ En attente : ${formatFCFA(pendingRevenue)}` : monthlyRevenue > 0 ? '✓ Tout confirmé' : '→ stable',
-      deltaClass: pendingRevenue > 0 ? 'text-orange-500' : monthlyRevenue > 0 ? 'text-green-600' : 'text-gray-400',
+      label: 'Revenus FCFA (mois)', value: confirmedRevenue > 0 ? confirmedRevenue.toLocaleString('fr-FR') : '0',
+      emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: confirmedRevenue >= 100000,
+      delta: pendingRevenue > 0 ? `⏳ À confirmer : ${formatFCFA(pendingRevenue)}` : expectedRevenue > 0 ? `Attendu ce mois : ${formatFCFA(expectedRevenue)}` : '→ stable',
+      deltaClass: pendingRevenue > 0 ? 'text-orange-500' : 'text-gray-400',
     },
     {
       label: 'Familles actives', value: activeEngagements.length, emoji: '👨‍👩‍👧',
@@ -460,41 +466,29 @@ export default function TutorDashboardPage() {
               {pendingEngagements.map(e => {
                 const par = parentProfiles[e.parentId]
                 return (
-                  <div key={e.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-blue-100">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                      style={{ backgroundColor: par?.avatarColor || '#16A085' }}
-                    >
-                      {par?.firstName?.[0] || '?'}{par?.lastName?.[0] || ''}
+                  <div key={e.id} className="p-3 bg-white rounded-xl border border-blue-100">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0" style={{ backgroundColor: par?.avatarColor || '#16A085' }}>
+                        {par?.firstName?.[0] || '?'}{par?.lastName?.[0] || ''}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{par ? `${par.firstName} ${par.lastName}` : 'Parent'}</p>
+                        <p className="text-xs text-primary font-medium">{levelPackages.find(p => p.levelKey === e.levelKey)?.label || 'Contrat'} · {formatFCFA(e.monthlyRate)}/mois</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800">
-                        <span className="text-primary font-semibold">{levelPackages.find(p => p.levelKey === e.levelKey)?.label || 'Contrat'}</span>
-                        {e.subject ? ` · ${e.subject}` : ''}
-                        {par && ` — ${par.firstName} ${par.lastName}`}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFCFA(e.monthlyRate)}/mois · {e.agreedSchedule || `Débute le ${shortDate(e.startDate)}`}
-                      </p>
+                    <div className="text-xs text-gray-600 space-y-1 mb-3 pl-1">
+                      {e.subject && <p><span className="text-gray-400">Matières :</span> {e.subject}</p>}
+                      <p><span className="text-gray-400">Jours souhaités :</span> {e.agreedSchedule || 'à convenir'}</p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleRespondEngagement(e.id, false)}
-                        disabled={respondingId === e.id}
-                        title="Refuser"
-                        className="w-9 h-9 rounded-full flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                      >
-                        <X size={16} />
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => handleRespondEngagement(e.id, true)} disabled={respondingId === e.id} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 py-2 bg-secondary text-white text-sm font-semibold rounded-full hover:bg-secondary-600 disabled:opacity-50 transition-colors">
+                        {respondingId === e.id ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check size={15} />} Accepter
                       </button>
-                      <button
-                        onClick={() => handleRespondEngagement(e.id, true)}
-                        disabled={respondingId === e.id}
-                        title="Accepter"
-                        className="w-9 h-9 rounded-full flex items-center justify-center bg-green-50 text-green-600 hover:bg-green-100 disabled:opacity-50 transition-colors"
-                      >
-                        {respondingId === e.id
-                          ? <span className="w-4 h-4 border-2 border-green-400/30 border-t-green-600 rounded-full animate-spin" />
-                          : <Check size={16} />}
+                      <button onClick={() => handleRespondEngagement(e.id, false)} disabled={respondingId === e.id} className="flex items-center justify-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-full hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                        <X size={15} /> Refuser
+                      </button>
+                      <button onClick={() => handleContactParent(e.parentId)} className="flex items-center justify-center gap-1.5 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-medium rounded-full hover:bg-gray-50 transition-colors">
+                        <Send size={14} /> Discuter
                       </button>
                     </div>
                   </div>
@@ -709,32 +703,21 @@ export default function TutorDashboardPage() {
                   const par = parentProfiles[e.parentId]
                   const bars = ['bg-secondary', 'bg-primary', 'bg-accent', 'bg-green-500']
                   return (
-                    <div key={e.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl">
-                      <div className={`w-1 h-10 rounded-full flex-shrink-0 ${bars[idx % bars.length]}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 leading-tight truncate">
-                          {par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'} · {e.subject}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">{shortDate(e.startDate)} → {shortDate(e.endDate)}</p>
+                    <div key={e.id} className="p-3 border border-gray-100 rounded-xl">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'}</p>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex-shrink-0">Actif</span>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-black text-gray-900">{formatFCFA(e.monthlyRate)}</p>
-                        <p className="text-[10px] font-bold text-green-600 mt-0.5">Actif ✓</p>
-                        <button onClick={() => setEndModal(e)} className="text-[10px] text-red-500 hover:text-red-600 font-medium mt-0.5">Mettre fin</button>
+                      <p className="text-xs text-primary font-medium mt-0.5">{levelPackages.find(p => p.levelKey === e.levelKey)?.label || 'Contrat'}{e.subject ? ` · ${e.subject}` : ''}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-gray-400">{shortDate(e.startDate)} → {shortDate(e.endDate)} · <strong className="text-gray-700">{formatFCFA(e.monthlyRate)}</strong>/mois</p>
+                        <button onClick={() => setEndModal(e)} className="text-xs text-red-500 hover:text-red-600 font-medium">Mettre fin</button>
                       </div>
                     </div>
                   )
                 })}
               </div>
             )}
-            {/* Abonnement mini-résumé */}
-            <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500">Abonnement · <span className={`font-semibold ${isPremium ? 'text-accent' : 'text-gray-700'}`}>{getStatusLabel(tutor.subscription?.plan || 'gratuit')}</span></p>
-                {isSubscriptionActive && <p className="text-[10px] text-gray-400 mt-0.5">{daysLeft} jours restants</p>}
-              </div>
-              <Link href="/abonnement" className="text-xs text-primary font-semibold hover:underline">Gérer</Link>
-            </div>
           </div>
 
           {/* Modale de résiliation */}

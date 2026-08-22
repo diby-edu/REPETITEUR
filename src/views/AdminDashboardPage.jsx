@@ -14,7 +14,7 @@ import {
 import { formatDateShort, formatFCFA, getDocumentApprovalProgress } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
-const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Contrats', 'Paiements', 'Avis']
+const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Contrats', 'Paiements', 'Avis']
 const TODAY = new Date().toISOString().split('T')[0]
 
 // Week / month boundaries (computed once at module load)
@@ -212,7 +212,7 @@ function SparklineChart({ data, height = 80 }) {
 }
 
 export default function AdminDashboardPage() {
-  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors } = useApp()
+  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors, levelPackages, updateLevelPackage } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -231,6 +231,7 @@ export default function AdminDashboardPage() {
   const [subMonths, setSubMonths]           = useState(1)
   const [subBusy, setSubBusy]               = useState(false)
   const [reopenedId, setReopenedId]         = useState(null)   // dossier traité rouvert pour re-revue
+  const [forfaitEdits, setForfaitEdits]     = useState({})     // éditions locales des forfaits
   const [userFilter, setUserFilter]         = useState('')
   const [userRoleFilter, setUserRoleFilter] = useState('all')   // 'all' | 'tutor' | 'parent'
   const [userStatusFilter, setUserStatusFilter] = useState('all') // 'all' | 'verified' | 'pending' | 'rejected'
@@ -1150,6 +1151,50 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* ── Tab: Forfaits ───────────────────────────────────── */}
+        {activeTab === 'Forfaits' && (
+          <div className="space-y-3">
+            <div className="card bg-blue-50 border-blue-100">
+              <p className="text-sm text-blue-800">Forfaits imposés par niveau. Modifie le nombre de séances/semaine, la durée d'une séance et le total mensuel — ces valeurs cadrent les offres des répétiteurs.</p>
+            </div>
+            {levelPackages.length === 0 ? (
+              <div className="card text-center py-8">
+                <p className="text-sm text-gray-400">Aucun forfait chargé — lance la migration <code>supabase_lot1_forfaits.sql</code>.</p>
+              </div>
+            ) : levelPackages.map(pkg => {
+              const e = forfaitEdits[pkg.levelKey] || {}
+              const val = (f) => (e[f] ?? pkg[f])
+              const set = (f, v) => setForfaitEdits(p => ({ ...p, [pkg.levelKey]: { ...p[pkg.levelKey], [f]: v } }))
+              const dirty = e.sessionsPerWeek != null || e.hoursPerSession != null || e.hoursPerMonth != null
+              return (
+                <div key={pkg.levelKey} className="card flex flex-wrap items-end gap-4">
+                  <div className="w-24 flex-shrink-0">
+                    <p className="font-semibold text-gray-800">{pkg.label}</p>
+                    <p className="text-xs text-gray-400 capitalize">{pkg.category}</p>
+                  </div>
+                  <label className="text-xs text-gray-500">Séances/sem.
+                    <input type="number" min="1" className="input-field mt-1 w-20" value={val('sessionsPerWeek')} onChange={ev => set('sessionsPerWeek', Number(ev.target.value))} />
+                  </label>
+                  <label className="text-xs text-gray-500">Heures/séance
+                    <input type="number" step="0.5" min="0.5" className="input-field mt-1 w-20" value={val('hoursPerSession')} onChange={ev => set('hoursPerSession', Number(ev.target.value))} />
+                  </label>
+                  <label className="text-xs text-gray-500">Total h/mois
+                    <input type="number" step="1" min="1" className="input-field mt-1 w-20" value={val('hoursPerMonth')} onChange={ev => set('hoursPerMonth', Number(ev.target.value))} />
+                  </label>
+                  <button
+                    disabled={!dirty}
+                    onClick={async () => { const ok = await updateLevelPackage(pkg.levelKey, e); if (ok) setForfaitEdits(p => { const n = { ...p }; delete n[pkg.levelKey]; return n }) }}
+                    className="btn-primary text-sm px-4 py-2 disabled:opacity-40"
+                  >
+                    Enregistrer
+                  </button>
+                  <p className="text-[11px] text-gray-400 w-full">{pkg.hasSubjects ? 'Matières choisies par le répétiteur' : 'Aucune matière (niveau global)'}</p>
+                </div>
+              )
+            })}
           </div>
         )}
 

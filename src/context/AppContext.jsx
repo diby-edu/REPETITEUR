@@ -88,6 +88,19 @@ function mapPublicTutor(r) {
   }
 }
 
+function mapLevelPackage(r) {
+  return {
+    levelKey: r.level_key,
+    label: r.label,
+    category: r.category,
+    sessionsPerWeek: r.sessions_per_week,
+    hoursPerSession: parseFloat(r.hours_per_session),
+    hoursPerMonth: parseFloat(r.hours_per_month),
+    hasSubjects: r.has_subjects,
+    sortOrder: r.sort_order,
+  }
+}
+
 function mapConversation(row) {
   return {
     id: row.id,
@@ -218,6 +231,7 @@ function mapPayment(row) {
 export function AppProvider({ children }) {
   const { currentUser } = useAuth()
   const [tutors, setTutors] = useState([])
+  const [levelPackages, setLevelPackages] = useState([])
   const [conversations, setConversations] = useState([])
   const [bookings, setBookings] = useState([])
   const [reviews, setReviews] = useState([])
@@ -256,6 +270,28 @@ export function AppProvider({ children }) {
   }, [currentUser?.role])
 
   useEffect(() => { reloadTutors() }, [reloadTutors])
+
+  // ── FORFAITS (level_packages) — référentiel imposé, éditable admin ──
+  const loadLevelPackages = useCallback(async () => {
+    const { data, error } = await supabase.from('level_packages').select('*').order('sort_order')
+    if (error) { console.error('loadLevelPackages:', error); return }
+    setLevelPackages(data.map(mapLevelPackage))
+  }, [])
+
+  useEffect(() => { loadLevelPackages() }, [loadLevelPackages])
+
+  const updateLevelPackage = useCallback(async (levelKey, patch) => {
+    const dbPatch = {}
+    if (patch.sessionsPerWeek != null) dbPatch.sessions_per_week = Number(patch.sessionsPerWeek)
+    if (patch.hoursPerSession != null) dbPatch.hours_per_session = Number(patch.hoursPerSession)
+    if (patch.hoursPerMonth != null)   dbPatch.hours_per_month   = Number(patch.hoursPerMonth)
+    if (Object.keys(dbPatch).length === 0) return false
+    const { error } = await supabase.from('level_packages').update(dbPatch).eq('level_key', levelKey)
+    if (error) { showToast('Erreur lors de la mise à jour du forfait.', 'error'); return false }
+    setLevelPackages(prev => prev.map(l => l.levelKey !== levelKey ? l : { ...l, ...patch }))
+    showToast('Forfait mis à jour.')
+    return true
+  }, [showToast])
 
   const getTutor = (id) => tutors.find(t => t.id === id)
   const getActiveTutors = () => tutors.filter(t =>
@@ -1011,6 +1047,9 @@ export function AppProvider({ children }) {
       // Tuteurs
       getTutor, getActiveTutors, getPendingTutors, reloadTutors,
       validateTutor, reviewDocument, updateTutorSubscription, suspendTutor, unsuspendTutor, updateTutorAvailability,
+
+      // Forfaits (refonte)
+      levelPackages, loadLevelPackages, updateLevelPackage,
 
       // Conversations & messages
       getConversation, getUserConversations, getOrCreateConversation,

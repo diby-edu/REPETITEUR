@@ -53,7 +53,7 @@ export const SUBSCRIPTION_PLANS = [
       'Accès aux demandes de séances',
       'Messagerie avec les parents',
       'Statistiques de base',
-      'Calendrier de disponibilités',
+      'Gestion des contrats et des séances',
     ],
     restrictions: [],
     recommended: false,

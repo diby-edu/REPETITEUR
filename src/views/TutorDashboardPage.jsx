@@ -507,7 +507,7 @@ export default function TutorDashboardPage() {
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               {matchingParents.length > 0
-                ? `${matchingParents.length} parent${matchingParents.length > 1 ? 's' : ''} correspondent à votre profil`
+                ? `${matchingParents.length} parent${matchingParents.length > 1 ? 's' : ''} correspond${matchingParents.length > 1 ? 'ent' : ''} à votre profil`
                 : "Aucun parent correspondant pour l'instant"}
             </p>
           </div>

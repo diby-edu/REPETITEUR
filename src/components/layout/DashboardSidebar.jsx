@@ -66,7 +66,7 @@ export default function DashboardSidebar({ isOpen = false, onClose = () => {} })
   const RESUME_ROWS = {
     tutor: [
       { label: 'Séances ce mois', value: monthSessions.length },
-      { label: 'Revenus mois',    value: monthRevenue > 0 ? `${monthRevenue.toLocaleString('fr-FR')} F` : '0 F' },
+      { label: 'Attendu ce mois', value: monthRevenue > 0 ? `${monthRevenue.toLocaleString('fr-FR')} F` : '0 F' },
       { label: 'Contrats actifs', value: activeEng.length },
       { label: 'Note moyenne',    value: currentUser.rating > 0 ? `${currentUser.rating?.toFixed(1)} ★` : '—' },
     ],
@@ -74,7 +74,7 @@ export default function DashboardSidebar({ isOpen = false, onClose = () => {} })
       { label: 'Séances planifiées',    value: upcomingSess.length },
       { label: 'Contrats actifs',       value: activeEng.length },
       { label: 'Répétiteurs contactés', value: conversations.length },
-      { label: 'Dépenses mois',         value: monthSpend > 0 ? `${monthSpend.toLocaleString('fr-FR')} F` : '0 F' },
+      { label: 'Attendu ce mois',       value: monthSpend > 0 ? `${monthSpend.toLocaleString('fr-FR')} F` : '0 F' },
     ],
     admin: [
       { label: 'Répétiteurs vérifiés', value: verifiedT.length },

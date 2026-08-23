@@ -284,7 +284,7 @@ begin
       ' (' || eng.subject || ') se termine le ' ||
       to_char(eng.end_date, 'DD/MM/YYYY') ||
       '. Préparez le règlement de ' ||
-      to_char(eng.monthly_rate, 'FM999G999') || ' FCFA.',
+      replace(to_char(eng.monthly_rate, 'FM999,999,999'), ',', ' ') || ' FCFA.',
       '/tableau-de-bord/parent'
     );
   end loop;
@@ -330,7 +330,7 @@ begin
     'Nouveau contrat proposé',
     p.first_name || ' ' || p.last_name ||
     ' vous propose un contrat de répétition en ' || new.subject ||
-    ' (' || to_char(new.monthly_rate, 'FM999G999') || ' FCFA/mois).',
+    ' (' || replace(to_char(new.monthly_rate, 'FM999,999,999'), ',', ' ') || ' FCFA/mois).',
     '/tableau-de-bord/repetiteur'
   );
   return new;
@@ -436,7 +436,7 @@ begin
       'Paiement déclaré — action requise',
       p.first_name || ' ' || p.last_name ||
       ' a déclaré avoir payé ' ||
-      to_char(new.amount, 'FM999G999') || ' FCFA (' || method_label || '). ' ||
+      replace(to_char(new.amount, 'FM999,999,999'), ',', ' ') || ' FCFA (' || method_label || '). ' ||
       case when new.parent_wants_continue
         then 'Souhaite continuer le mois prochain.'
         else 'Ne souhaite pas renouveler le contrat.'

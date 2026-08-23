@@ -590,100 +590,31 @@ export default function TutorDashboardPage() {
           {/* Agenda semaine — grille 7 jours */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-900">📅 Semaine en cours</h2>
+              <h2 className="text-sm font-bold text-gray-900">📅 Ce mois-ci</h2>
               <Link href="/reservations" className="text-xs text-primary font-medium hover:underline">Voir tout</Link>
             </div>
-            {(() => {
-              const SUBJ_COLORS = [
-                'bg-primary/10 text-primary border-primary/20',
-                'bg-blue-50 text-blue-700 border-blue-100',
-                'bg-green-50 text-green-700 border-green-100',
-                'bg-purple-50 text-purple-700 border-purple-100',
-                'bg-orange-50 text-orange-700 border-orange-100',
-              ]
-              const subjColorMap = {}
-              let colorIdx = 0
-              const getSubjColor = (subject) => {
-                if (!subjColorMap[subject]) subjColorMap[subject] = SUBJ_COLORS[colorIdx++ % SUBJ_COLORS.length]
-                return subjColorMap[subject]
-              }
-              const today   = new Date()
-              const todayStr = today.toISOString().split('T')[0]
-              const dow = today.getDay()
-              const monday = new Date(today)
-              monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
-              monday.setHours(0, 0, 0, 0)
-              const WEEK_DAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
-              const weekDates = Array.from({ length: 7 }, (_, i) => {
-                const d = new Date(monday)
-                d.setDate(monday.getDate() + i)
-                return d
-              })
-              const sessionsThisWeek = allSessions.filter(s => {
-                const d = toDate(s.scheduledDate)
-                return d >= monday && d <= new Date(monday.getTime() + 6 * 86400000 + 86399999)
-              })
-              const hasSessions = sessionsThisWeek.length > 0
-              return (
-                <div>
-                  <div className="grid grid-cols-7 gap-1">
-                    {weekDates.map((date, i) => {
-                      const dateStr = date.toISOString().split('T')[0]
-                      const isToday = dateStr === todayStr
-                      const isPast  = date < new Date(new Date().toDateString())
-                      const daySessions = sessionsThisWeek.filter(s => s.scheduledDate === dateStr)
-                      return (
-                        <div key={i} className={`flex flex-col items-center gap-1 rounded-xl py-2 px-0.5 transition-colors ${isToday ? 'bg-primary/8 ring-1 ring-primary/20' : ''}`}>
-                          <span className={`text-[9px] font-black uppercase tracking-wide ${isToday ? 'text-primary' : isPast ? 'text-gray-300' : 'text-gray-400'}`}>
-                            {WEEK_DAYS[i]}
-                          </span>
-                          <span className={`text-sm font-black leading-none ${isToday ? 'text-primary' : isPast ? 'text-gray-300' : 'text-gray-700'}`}>
-                            {date.getDate()}
-                          </span>
-                          <div className="flex flex-col gap-0.5 w-full mt-0.5">
-                            {daySessions.length === 0 && (
-                              <div className="h-1 rounded-full bg-gray-100 mx-1" />
-                            )}
-                            {daySessions.slice(0, 3).map(s => {
-                              const eng = engagements.find(e => e.id === s.engagementId)
-                              return (
-                                <div
-                                  key={s.id}
-                                  title={`${eng?.subject || '?'} · ${s.scheduledTime?.slice(0,5) || ''}`}
-                                  className={`w-full h-1.5 rounded-full border ${getSubjColor(eng?.subject || '?')}`}
-                                />
-                              )
-                            })}
-                            {daySessions.length > 3 && (
-                              <span className="text-[8px] text-center text-gray-400 font-bold">+{daySessions.length - 3}</span>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {hasSessions ? (
-                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-                      {sessionsThisWeek.slice(0, 4).map(s => {
-                        const eng = engagements.find(e => e.id === s.engagementId)
-                        const par = eng ? parentProfiles[eng.parentId] : null
-                        const d   = toDate(s.scheduledDate)
-                        return (
-                          <div key={s.id} className="flex items-center gap-2">
-                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.scheduledDate === todayStr ? 'bg-primary' : 'bg-gray-300'}`} />
-                            <span className="text-[11px] text-gray-500 w-8 flex-shrink-0 tabular-nums">{WEEK_DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()}</span>
-                            <span className="text-[11px] font-semibold text-gray-800 truncate flex-1">{eng?.subject}{par ? ` · ${par.firstName}` : ''}</span>
-                            <span className="text-[10px] text-gray-400 flex-shrink-0">{s.scheduledTime?.slice(0,5)}</span>
-                          </div>
-                        )
-                      })}
+            {activeEngagements.length === 0 ? (
+              <p className="text-center text-xs text-gray-400 py-8">Aucun contrat actif</p>
+            ) : (
+              <div className="space-y-2">
+                {activeEngagements.slice(0, 4).map(e => {
+                  const par = parentProfiles[e.parentId]
+                  const pkg = levelPackages.find(p => p.levelKey === e.levelKey)
+                  const total = pkg ? pkg.sessionsPerWeek * 4 : 0
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-xl">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style={{ backgroundColor: par?.avatarColor || '#16A085' }}>
+                        {par?.firstName?.[0] || '?'}{par?.lastName?.[0] || ''}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'} · {pkg?.label || 'Contrat'}</p>
+                        <p className="text-xs text-gray-500">{e.sessionsDone}/{total} séances validées · jusqu'au {shortDate(e.endDate)}</p>
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-center text-xs text-gray-400 mt-4 pb-2">Aucune séance cette semaine</p>
-                  )}
-                </div>
-              )
-            })()}
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Contrats actifs */}

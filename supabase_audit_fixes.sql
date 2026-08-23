@@ -269,6 +269,10 @@ begin
   new.monthly_rate := old.monthly_rate;
   new.start_date   := old.start_date;
   new.created_at   := old.created_at;
+  -- « Séances validées » : réservé au PARENT du contrat (cf. Lot 5B).
+  if auth.uid() <> old.parent_id then
+    new.sessions_done := old.sessions_done;
+  end if;
   return new;
 end;
 $$ language plpgsql security definer set search_path = public;

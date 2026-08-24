@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
+import StarRating from '../components/common/StarRating'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR      = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -47,7 +48,8 @@ export default function TutorDashboardPage() {
   const { currentUser } = useAuth()
   const {
     getUserConversations, getUserNotifications, getUnreadNotifCount,
-    loadUserConversations, loadUserNotifications, subscribeToNotifications, subscribeToEngagements,
+    loadUserConversations, loadUserNotifications, subscribeToNotifications, subscribeToEngagements, subscribeToReviews,
+    loadTutorReviews, getTutorReviews,
     getOrCreateConversation,
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
@@ -103,10 +105,12 @@ export default function TutorDashboardPage() {
     loadUserEngagements(tutor.id, 'tutor')
     loadAllUserSessions(tutor.id, 'tutor')
     loadUserNotifications(tutor.id)
+    loadTutorReviews(tutor.id)
     runMaintenanceTasks()
     const unsubNotif = subscribeToNotifications(tutor.id)
     const unsubEng = subscribeToEngagements(tutor.id, 'tutor')
-    return () => { unsubNotif?.(); unsubEng?.() }
+    const unsubRev = subscribeToReviews(tutor.id)
+    return () => { unsubNotif?.(); unsubEng?.(); unsubRev?.() }
   }, [tutor?.id])
 
   // Parents cherchant un répétiteur dans la même ville
@@ -235,6 +239,7 @@ export default function TutorDashboardPage() {
   const daysLeft          = getSubscriptionDaysLeft(tutor.subscription?.endDate)
   const isSubscriptionActive = tutor.subscription?.status === 'active'
   const isVerified        = tutor.verificationStatus === 'verified'
+  const myReviews         = getTutorReviews(tutor.id)
   const isPremium         = tutor.subscription?.plan === 'premium'
   const hasId             = tutor.documents?.cniRecto || tutor.documents?.passport || tutor.documents?.cni
 
@@ -792,6 +797,51 @@ export default function TutorDashboardPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── Vos avis ────────────────────────────────────────────── */}
+        <div className="card mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Star size={18} className="text-accent" />
+              Vos avis
+              {myReviews.length > 0 && <span className="text-sm font-normal text-gray-400">({myReviews.length})</span>}
+            </h2>
+            {tutor.rating > 0 && (
+              <div className="flex items-center gap-1.5 text-sm">
+                <Star size={15} className="text-accent" fill="#F4A61D" />
+                <span className="font-bold text-gray-900">{tutor.rating.toFixed(1)}</span>
+                <span className="text-gray-400">/ 5</span>
+              </div>
+            )}
+          </div>
+          {myReviews.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">
+              Aucun avis pour le moment. Les avis laissés par vos familles apparaîtront ici.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {myReviews.map(r => (
+                <div key={r.id} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {r.anonymous ? 'Parent vérifié' : r.parentName}
+                    </p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <StarRating rating={r.rating} showNumber={false} size={13} />
+                      <span className="text-xs text-gray-400">{formatDateShort(r.date)}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 leading-relaxed">{r.comment}</p>
+                  {r.tutorResponse && (
+                    <div className="mt-2 ml-1 pl-3 border-l-2 border-primary-100">
+                      <p className="text-xs text-gray-500"><strong>Votre réponse :</strong> {r.tutorResponse}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>

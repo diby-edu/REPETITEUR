@@ -160,6 +160,7 @@ function mapReview(row) {
     parentId: row.parent_id,
     bookingId: row.booking_id,
     parentName: row.parent_name,
+    anonymous: row.anonymous === true,
     rating: row.rating,
     comment: row.comment,
     tutorResponse: row.tutor_response,
@@ -258,6 +259,7 @@ export function AppProvider({ children }) {
   const [toast, setToast] = useState(null)
   const notifChannelRef = useRef(null)
   const engChannelRef = useRef(null)
+  const reviewChannelRef = useRef(null)
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type, id: Date.now() })
@@ -645,6 +647,7 @@ export function AppProvider({ children }) {
         parent_id: reviewData.parentId,
         booking_id: reviewData.bookingId || null,
         parent_name: reviewData.parentName,
+        anonymous: reviewData.anonymous ?? false,
         rating: reviewData.rating,
         comment: reviewData.comment,
       })
@@ -757,6 +760,20 @@ export function AppProvider({ children }) {
     engChannelRef.current = channel
     return () => supabase.removeChannel(channel)
   }, [loadUserEngagements])
+
+  // Temps réel des avis d'un répétiteur (sa fiche + son dashboard « Vos avis »).
+  const subscribeToReviews = useCallback((tutorId) => {
+    if (reviewChannelRef.current) supabase.removeChannel(reviewChannelRef.current)
+    const channel = supabase
+      .channel(`reviews:${tutorId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'reviews',
+        filter: `tutor_id=eq.${tutorId}`,
+      }, () => { loadTutorReviews(tutorId) })
+      .subscribe()
+    reviewChannelRef.current = channel
+    return () => supabase.removeChannel(channel)
+  }, [loadTutorReviews])
 
   // ── FAVORIS ─────────────────────────────────────────────────
 
@@ -1150,7 +1167,7 @@ export function AppProvider({ children }) {
 
       // Notifications
       loadUserNotifications, getUserNotifications, getUnreadNotifCount,
-      markNotificationsRead, deleteNotification, subscribeToNotifications, subscribeToEngagements,
+      markNotificationsRead, deleteNotification, subscribeToNotifications, subscribeToEngagements, subscribeToReviews,
 
       // Favoris
       loadUserFavorites, toggleFavorite, getUserFavorites, isFavorite,

@@ -113,7 +113,7 @@ export default function TutorProfilePage() {
       parentName: `${currentUser.firstName.charAt(0)}. ${currentUser.lastName}`,
       ...reviewForm,
     })
-    setReviewForm({ rating: 0, comment: '' })
+    setReviewForm({ rating: 0, comment: '', anonymous: false })
     setActiveTab('avis')
   }
 
@@ -336,7 +336,7 @@ export default function TutorProfilePage() {
                       {reviews.slice(0, 3).map(review => (
                         <div key={review.id} className="border-b border-gray-50 last:border-0 pb-3 last:pb-0">
                           <div className="flex items-center justify-between mb-1">
-                            <p className="text-sm font-semibold text-gray-800">{review.parentName}</p>
+                            <p className="text-sm font-semibold text-gray-800">{review.anonymous ? 'Parent vérifié' : review.parentName}</p>
                             <StarRating rating={review.rating} showNumber={false} size={13} />
                           </div>
                           <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{review.comment}</p>
@@ -420,7 +420,7 @@ export default function TutorProfilePage() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-gray-800 text-sm">{review.parentName}</p>
+                          <p className="font-semibold text-gray-800 text-sm">{review.anonymous ? 'Parent vérifié' : review.parentName}</p>
                           <p className="text-xs text-gray-400">{formatDate(review.date)}</p>
                         </div>
                         <StarRating rating={review.rating} showNumber={false} />
@@ -492,6 +492,15 @@ export default function TutorProfilePage() {
                           onChange={e => setReviewForm(p => ({ ...p, comment: e.target.value }))}
                         />
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!!reviewForm.anonymous}
+                          onChange={e => setReviewForm(p => ({ ...p, anonymous: e.target.checked }))}
+                          className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <span className="text-sm text-gray-600">Publier en anonyme (votre nom sera masqué — affiché « Parent vérifié »)</span>
+                      </label>
                       <button type="submit" disabled={!reviewForm.rating || !reviewForm.comment} className="btn-primary text-sm disabled:opacity-50">
                         Publier l'avis
                       </button>

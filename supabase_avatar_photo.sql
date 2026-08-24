@@ -13,14 +13,17 @@ alter table public.profiles
   add column if not exists avatar_url text;
 
 -- Vue profils publics (+ avatar_url)
-create or replace view public.public_profiles as
+-- DROP + CREATE : CREATE OR REPLACE interdit d'insérer une colonne au milieu.
+drop view if exists public.public_profiles;
+create view public.public_profiles as
   select id, role, first_name, last_name, city, quartier, avatar_color, avatar_url,
          join_date, subjects_needed, child_level, child_levels, open_to_contact
   from public.profiles;
 grant select on public.public_profiles to anon, authenticated;
 
 -- Vue répétiteurs publics (version Lot 3 + avatar_url)
-create or replace view public.public_tutors as
+drop view if exists public.public_tutors;
+create view public.public_tutors as
   select
     p.id, p.first_name, p.last_name, p.city, p.quartier, p.avatar_color, p.avatar_url, p.join_date,
     t.bio, t.subjects, t.levels, t.monthly_rate, t.modalities, t.availability,

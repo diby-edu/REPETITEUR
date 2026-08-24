@@ -158,24 +158,27 @@ export function truncate(text, maxLength = 120) {
 // Décompose le dossier d'un répétiteur en items individuellement révisables
 // (pièce d'identité, selfie, chaque diplôme) pour l'affichage du statut
 // détaillé et de la barre de progression d'approbation.
-export function getDocumentApprovalProgress(documents) {
+export function getDocumentApprovalProgress(documents, isVerified = false) {
   const docs = documents || {}
   const isPassport = docs.idType === 'passport'
   const idSubmitted = isPassport ? !!docs.passport : !!(docs.cniRecto && docs.cniVerso)
   const diplomas = docs.diplomes || []
+  // Un profil « vérifié » implique que ses pièces sont acceptées : on force
+  // l'affichage « approuvé » (évite l'incohérence Vérifié + pièce « En attente »).
+  const st = (raw) => (isVerified ? 'approved' : (raw || 'pending'))
 
   const items = []
   if (idSubmitted) {
     items.push({
       key: 'id', label: isPassport ? 'Passeport' : 'CNI (recto + verso)',
-      status: docs.idReview?.status || 'pending', reason: docs.idReview?.reason,
+      status: st(docs.idReview?.status), reason: docs.idReview?.reason,
     })
   }
   if (docs.selfiePath) {
-    items.push({ key: 'selfie', label: 'Selfie avec pièce', status: docs.selfieReview?.status || 'pending', reason: docs.selfieReview?.reason })
+    items.push({ key: 'selfie', label: 'Selfie avec pièce', status: st(docs.selfieReview?.status), reason: docs.selfieReview?.reason })
   }
   diplomas.forEach((d, i) => {
-    if (d.path) items.push({ key: `diploma-${i}`, label: d.name || `Diplôme ${i + 1}`, status: d.review?.status || 'pending', reason: d.review?.reason })
+    if (d.path) items.push({ key: `diploma-${i}`, label: d.name || `Diplôme ${i + 1}`, status: st(d.review?.status), reason: d.review?.reason })
   })
 
   const total = items.length

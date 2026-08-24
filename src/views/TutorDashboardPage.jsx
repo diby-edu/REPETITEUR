@@ -689,7 +689,8 @@ export default function TutorDashboardPage() {
                 const badge = (submitted, review) => {
                   if (!submitted) return { t: '✗ Non soumis', c: 'text-red-500' }
                   const s = review?.status
-                  if (s === 'approved') return { t: '✅ Approuvé', c: 'text-green-600' }
+                  // Profil vérifié ⇒ pièces acceptées (pas d'incohérence Vérifié + En attente)
+                  if (s === 'approved' || isVerified) return { t: '✅ Approuvé', c: 'text-green-600' }
                   if (s === 'rejected') return { t: '❌ Rejeté', c: 'text-red-500' }
                   return { t: '⏳ En attente', c: 'text-amber-600' }
                 }

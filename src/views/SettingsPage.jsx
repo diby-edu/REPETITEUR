@@ -26,7 +26,10 @@ const TABS_TUTOR = ['Profil', 'Tarifs', 'Documents', 'Sécurité', 'Notification
 const TABS_OTHER = ['Profil', 'Sécurité', 'Notifications']
 const ROLE_LABELS = { tutor: 'Répétiteur', parent: 'Parent', admin: 'Admin' }
 
-function DocUploadZone({ file, existingPath, onFile, inputRef, label, existingLabel }) {
+function DocUploadZone({ file, existingPath, onFile, inputRef, label, existingLabel, reviewStatus }) {
+  const rejected = reviewStatus === 'rejected'
+  // Un document déjà soumis n'est plus modifiable, SAUF s'il a été rejeté.
+  const locked = !!existingPath && !file && !rejected
   const done = !!file || !!existingPath
   return (
     <>
@@ -35,13 +38,18 @@ function DocUploadZone({ file, existingPath, onFile, inputRef, label, existingLa
         type="file"
         accept="image/jpeg,image/png,image/webp,application/pdf"
         className="hidden"
+        disabled={locked}
         onChange={e => onFile(e.target.files?.[0] || null)}
       />
       <button
         type="button"
-        onClick={() => inputRef.current?.click()}
-        className={`w-full border-2 border-dashed rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-          done ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-primary hover:bg-primary-50'
+        disabled={locked}
+        onClick={() => { if (!locked) inputRef.current?.click() }}
+        className={`w-full border-2 border-dashed rounded-xl p-3 flex flex-col items-center gap-1.5 transition-all ${
+          rejected ? 'border-red-400 bg-red-50 cursor-pointer'
+          : locked ? 'border-green-300 bg-green-50 cursor-default'
+          : done ? 'border-green-400 bg-green-50 cursor-pointer'
+          : 'border-gray-300 hover:border-primary hover:bg-primary-50 cursor-pointer'
         }`}
       >
         {file ? (
@@ -50,11 +58,17 @@ function DocUploadZone({ file, existingPath, onFile, inputRef, label, existingLa
             <span className="text-xs font-medium text-green-700 text-center break-all">{file.name}</span>
             <span className="text-xs text-gray-400">Cliquer pour changer</span>
           </>
+        ) : rejected ? (
+          <>
+            <AlertCircle size={20} className="text-red-500" />
+            <span className="text-xs font-medium text-red-700 text-center">Rejeté — renvoyer un document</span>
+            <span className="text-xs text-red-400">Cliquer pour choisir un fichier</span>
+          </>
         ) : existingPath ? (
           <>
             <CheckCircle size={20} className="text-green-500" />
             <span className="text-xs font-medium text-green-700 text-center">{existingLabel || 'Déjà soumis'}</span>
-            <span className="text-xs text-gray-400">Cliquer pour remplacer</span>
+            <span className="text-xs text-gray-400">Verrouillé — modifiable si rejeté</span>
           </>
         ) : (
           <>
@@ -100,7 +114,7 @@ export default function SettingsPage() {
   const [docCniVerso, setDocCniVerso] = useState(null)
   const [docPassport, setDocPassport] = useState(null)
   const [docDiplomas, setDocDiplomas] = useState(() => {
-    const existing = (existingDocs.diplomes || []).map(d => ({ name: d.name, path: d.path, file: null }))
+    const existing = (existingDocs.diplomes || []).map(d => ({ name: d.name, path: d.path, file: null, review: d.review }))
     return [...existing, { name: '', path: null, file: null }]
   })
   const [docSelfieDataUrl, setDocSelfieDataUrl] = useState(null)
@@ -169,19 +183,19 @@ export default function SettingsPage() {
       if (docCniRecto) {
         const ext = docCniRecto.name.split('.').pop()
         const { error } = await supabase.storage.from('documents').upload(`${userId}/cni_recto.${ext}`, docCniRecto, { upsert: true })
-        if (!error) { documents.cniRecto = true; documents.cniRectoPath = `${userId}/cni_recto.${ext}`; hasNewContent = true }
+        if (!error) { documents.cniRecto = true; documents.cniRectoPath = `${userId}/cni_recto.${ext}`; documents.idReview = null; hasNewContent = true }
         else setDocError(`Erreur upload CNI recto : ${error.message}`)
       }
       if (docCniVerso) {
         const ext = docCniVerso.name.split('.').pop()
         const { error } = await supabase.storage.from('documents').upload(`${userId}/cni_verso.${ext}`, docCniVerso, { upsert: true })
-        if (!error) { documents.cniVerso = true; documents.cniVersoPath = `${userId}/cni_verso.${ext}`; hasNewContent = true }
+        if (!error) { documents.cniVerso = true; documents.cniVersoPath = `${userId}/cni_verso.${ext}`; documents.idReview = null; hasNewContent = true }
         else setDocError(`Erreur upload CNI verso : ${error.message}`)
       }
     } else if (docPassport) {
       const ext = docPassport.name.split('.').pop()
       const { error } = await supabase.storage.from('documents').upload(`${userId}/passport.${ext}`, docPassport, { upsert: true })
-      if (!error) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}`; hasNewContent = true }
+      if (!error) { documents.passport = true; documents.passportPath = `${userId}/passport.${ext}`; documents.idReview = null; hasNewContent = true }
       else setDocError(`Erreur upload passeport : ${error.message}`)
     }
 
@@ -340,7 +354,7 @@ export default function SettingsPage() {
   const docs = currentUser?.documents || {}
   const hasId = !!((docs.cniRecto && docs.cniVerso) || docs.passport)
   const hasSelfie = !!docs.selfiePath
-  const docProgress = getDocumentApprovalProgress(docs)
+  const docProgress = getDocumentApprovalProgress(docs, currentUser?.verificationStatus === 'verified')
 
   return (
     <DashboardLayout>
@@ -592,7 +606,8 @@ export default function SettingsPage() {
                 <div className="card space-y-5">
                   <h2 className="font-semibold text-gray-900">Modifier vos documents</h2>
                   <p className="text-xs text-gray-400 -mt-3">
-                    La pièce d'identité et les diplômes peuvent être remplacés ou renommés. Le selfie n'est pas modifiable une fois envoyé.
+                    Un document déjà soumis n'est plus modifiable, sauf s'il a été <strong>rejeté</strong> — vous
+                    pouvez alors en renvoyer un autre. Le selfie n'est pas modifiable une fois envoyé.
                   </p>
 
                   {/* Pièce d'identité */}
@@ -623,6 +638,7 @@ export default function SettingsPage() {
                             inputRef={docCniRectoRef}
                             label="Charger le recto"
                             existingLabel="CNI Recto déjà soumis"
+                            reviewStatus={existingDocs.idReview?.status}
                           />
                         </div>
                         <div>
@@ -634,6 +650,7 @@ export default function SettingsPage() {
                             inputRef={docCniVersoRef}
                             label="Charger le verso"
                             existingLabel="CNI Verso déjà soumis"
+                            reviewStatus={existingDocs.idReview?.status}
                           />
                         </div>
                       </div>
@@ -647,6 +664,7 @@ export default function SettingsPage() {
                           inputRef={docPassportRef}
                           label="Charger la page photo"
                           existingLabel="Passeport déjà soumis"
+                          reviewStatus={existingDocs.idReview?.status}
                         />
                       </div>
                     )}
@@ -665,12 +683,17 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     <div className="space-y-3">
-                      {docDiplomas.map((d, i) => (
+                      {docDiplomas.map((d, i) => {
+                        const dRejected = d.review?.status === 'rejected'
+                        // Diplôme déjà soumis non modifiable, sauf s'il a été rejeté.
+                        const dLocked = !!d.path && !d.file && !dRejected
+                        return (
                         <div key={i} className="space-y-2">
                           <input
                             className="input-field text-sm"
                             placeholder={`Intitulé du diplôme ${i + 1} (ex: Licence Maths)`}
                             value={d.name}
+                            disabled={dLocked}
                             onChange={e => {
                               const next = [...docDiplomas]
                               next[i] = { ...next[i], name: e.target.value }
@@ -684,6 +707,7 @@ export default function SettingsPage() {
                                 accept="image/jpeg,image/png,image/webp,application/pdf"
                                 className="hidden"
                                 id={`doc-diploma-${i}`}
+                                disabled={dLocked}
                                 onChange={e => {
                                   const next = [...docDiplomas]
                                   next[i] = { ...next[i], file: e.target.files?.[0] || null }
@@ -692,22 +716,29 @@ export default function SettingsPage() {
                               />
                               <button
                                 type="button"
-                                onClick={() => document.getElementById(`doc-diploma-${i}`)?.click()}
+                                disabled={dLocked}
+                                onClick={() => { if (!dLocked) document.getElementById(`doc-diploma-${i}`)?.click() }}
                                 className={`w-full border-2 border-dashed rounded-xl p-2.5 flex items-center gap-2 text-xs transition-all ${
-                                  d.file || d.path ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-300 hover:border-primary text-gray-500'
+                                  dRejected ? 'border-red-400 bg-red-50 text-red-700'
+                                  : dLocked ? 'border-green-300 bg-green-50 text-green-700 cursor-default'
+                                  : d.file || d.path ? 'border-green-400 bg-green-50 text-green-700'
+                                  : 'border-gray-300 hover:border-primary text-gray-500'
                                 }`}
                               >
                                 {d.file
                                   ? <><CheckCircle size={14} className="text-green-500" /> {d.file.name}</>
-                                  : d.path
-                                    ? <><CheckCircle size={14} className="text-green-500" /> Déjà soumis — cliquer pour remplacer</>
-                                    : <><Upload size={14} /> Fichier du diplôme</>
+                                  : dRejected
+                                    ? <><AlertCircle size={14} className="text-red-500" /> Rejeté — cliquer pour renvoyer</>
+                                    : d.path
+                                      ? <><CheckCircle size={14} className="text-green-500" /> Déjà soumis — verrouillé</>
+                                      : <><Upload size={14} /> Fichier du diplôme</>
                                 }
                               </button>
                             </>
                           )}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
 

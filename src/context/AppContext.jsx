@@ -1150,6 +1150,7 @@ export function AppProvider({ children }) {
     await supabase.rpc('expire_ended_engagements')
     await supabase.rpc('check_expiring_engagements')
     await supabase.rpc('expire_lapsed_subscriptions')  // abonnement impayé → profil masqué + contrats résiliés
+    await supabase.rpc('notify_expiring_subscriptions') // alerte J-3 / J-1 au répétiteur
   }, [])
 
   // ── CONTEXT VALUE ────────────────────────────────────────────

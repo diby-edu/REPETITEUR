@@ -322,20 +322,24 @@ export default function TutorDashboardPage() {
               <AlertCircle size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-orange-800">Votre profil est invisible</p>
-                <p className="text-sm text-orange-700">Choisissez un abonnement pour apparaître dans les recherches.</p>
+                <p className="text-sm text-orange-700">Abonnez-vous pour apparaître dans les recherches, recevoir des demandes de contrat et discuter avec les parents.</p>
               </div>
               <Link href="/abonnement" className="text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg whitespace-nowrap">Choisir un plan</Link>
             </div>
           )}
 
           {isSubscriptionActive && daysLeft <= 7 && daysLeft > 0 && (
-            <div className="flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-              <AlertCircle size={20} className="text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className={`flex items-start gap-3 border rounded-xl p-4 ${daysLeft <= 3 ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+              <AlertCircle size={20} className={`flex-shrink-0 mt-0.5 ${daysLeft <= 3 ? 'text-red-600' : 'text-yellow-600'}`} />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-yellow-800">Abonnement bientôt expiré — {daysLeft} jour{daysLeft > 1 ? 's' : ''} restant{daysLeft > 1 ? 's' : ''}</p>
-                <p className="text-sm text-yellow-700">Renouvelez pour maintenir votre visibilité.</p>
+                <p className={`text-sm font-semibold ${daysLeft <= 3 ? 'text-red-800' : 'text-yellow-800'}`}>
+                  Abonnement bientôt expiré — {daysLeft} jour{daysLeft > 1 ? 's' : ''} restant{daysLeft > 1 ? 's' : ''}
+                </p>
+                <p className={`text-sm ${daysLeft <= 3 ? 'text-red-700' : 'text-yellow-700'}`}>
+                  Sans renouvellement : profil masqué des recherches, avis &amp; note cachés, contrats actifs résiliés.
+                </p>
               </div>
-              <Link href="/abonnement" className="text-xs font-semibold text-yellow-700 bg-yellow-100 hover:bg-yellow-200 px-3 py-1.5 rounded-lg whitespace-nowrap">Renouveler</Link>
+              <Link href="/abonnement" className={`text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap ${daysLeft <= 3 ? 'text-red-700 bg-red-100 hover:bg-red-200' : 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'}`}>Renouveler</Link>
             </div>
           )}
 

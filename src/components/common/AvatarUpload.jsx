@@ -92,9 +92,9 @@ export default function AvatarUpload({ user, userId, onUploaded, required = fals
                 <Upload size={15} /> {busy ? 'Envoi…' : 'Charger une image'}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">
-              JPG, PNG ou WebP — 5 Mo max{required && !current ? ' · obligatoire' : ''}
-            </p>
+            {required && !current
+              ? <p className="text-xs text-red-600 font-medium mt-1.5">Photo de profil obligatoire pour être visible auprès des parents.</p>
+              : <p className="text-xs text-gray-400 mt-1.5">JPG, PNG ou WebP — 5 Mo max</p>}
             {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
           </div>
         )}

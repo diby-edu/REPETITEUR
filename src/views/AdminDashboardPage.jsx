@@ -9,12 +9,12 @@ import StarRating from '../components/common/StarRating'
 import {
   Users, GraduationCap, Calendar, TrendingUp, ShieldCheck,
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
-  BarChart3, FileText, ExternalLink, Wallet, Star,
+  BarChart3, FileText, ExternalLink, Wallet, Star, MessageSquare,
 } from 'lucide-react'
 import { formatDateShort, formatFCFA, getDocumentApprovalProgress } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
-const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Contrats', 'Paiements', 'Avis']
+const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Contrats', 'Paiements', 'Avis', 'Conversations']
 const TODAY = new Date().toISOString().split('T')[0]
 
 // Week / month boundaries (computed once at module load)
@@ -241,6 +241,10 @@ export default function AdminDashboardPage() {
   const [engStats, setEngStats]         = useState({ pending: 0, active: 0, ended: 0 })
   const [sessionStats, setSessionStats] = useState({ upcoming: 0, toConfirm: 0, reported: 0 })
   const [payStats, setPayStats]         = useState({ pendingDecl: 0, confirmed: 0 })
+  const [adminConvs, setAdminConvs]     = useState([])          // modération : toutes les conversations
+  const [convProfiles, setConvProfiles] = useState({})          // id → {first_name,last_name,role}
+  const [adminConvId, setAdminConvId]   = useState(null)        // conversation ouverte
+  const [adminMessages, setAdminMessages] = useState([])
   const [recentEngagements, setRecentEngagements] = useState([])
   const [paymentsList, setPaymentsList] = useState([])
   const [reviewsList, setReviewsList]   = useState([])
@@ -421,6 +425,34 @@ export default function AdminDashboardPage() {
         setReviewsList(revs.map(r => ({ ...r, reviewerName: pMap[r.reviewer_id] || '—', tutorName: pMap[r.tutor_id] || '—' })))
       })
   }, [activeTab])
+
+  // ── Load Conversations tab (modération) ──────────────────────
+  useEffect(() => {
+    if (activeTab !== 'Conversations') return
+    ;(async () => {
+      const { data: convs } = await supabase
+        .from('conversations').select('*')
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+      setAdminConvs(convs || [])
+      const ids = [...new Set((convs || []).flatMap(c => [c.participant_1, c.participant_2]).filter(Boolean))]
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, role').in('id', ids)
+        const map = {}; (profs || []).forEach(p => { map[p.id] = p })
+        setConvProfiles(map)
+      }
+    })()
+  }, [activeTab])
+
+  const openAdminConv = async (conv) => {
+    setAdminConvId(conv.id)
+    const { data } = await supabase.from('messages').select('*')
+      .eq('conversation_id', conv.id).order('created_at', { ascending: true })
+    setAdminMessages(data || [])
+  }
+  const convName = (id) => {
+    const p = convProfiles[id]
+    return p ? `${p.first_name} ${p.last_name}` : '—'
+  }
 
   // ── CSV Export ───────────────────────────────────────────────
   const exportCSV = async () => {
@@ -1409,6 +1441,63 @@ export default function AdminDashboardPage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'Conversations' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Conversations ({adminConvs.length})</h3>
+              <span className="text-xs text-gray-400">Lecture seule — modération</span>
+            </div>
+            {adminConvs.length === 0 ? (
+              <div className="card text-center py-12">
+                <MessageSquare size={40} className="text-gray-200 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm">Aucune conversation</p>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-[320px_1fr] gap-4">
+                {/* Liste */}
+                <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
+                  {adminConvs.map(c => {
+                    const active = c.id === adminConvId
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => openAdminConv(c)}
+                        className={`w-full text-left card p-3 transition-colors ${active ? 'ring-2 ring-primary' : 'hover:bg-gray-50'}`}
+                      >
+                        <p className="text-sm font-semibold text-gray-800 truncate">
+                          {convName(c.participant_1)} ↔ {convName(c.participant_2)}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{c.last_message_content || 'Aucun message'}</p>
+                        {c.last_message_at && <p className="text-[11px] text-gray-400 mt-0.5">{formatDateShort(c.last_message_at)}</p>}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Fil */}
+                <div className="card min-h-[300px]">
+                  {!adminConvId ? (
+                    <p className="text-sm text-gray-400 text-center py-16">Sélectionnez une conversation à modérer.</p>
+                  ) : adminMessages.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-16">Aucun message dans cette conversation.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {adminMessages.map(m => (
+                        <div key={m.id} className="border-b border-gray-50 last:border-0 pb-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-gray-700">{convName(m.sender_id)}</p>
+                            <span className="text-[11px] text-gray-400">{formatDateShort(m.created_at)}</span>
+                          </div>
+                          <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{m.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

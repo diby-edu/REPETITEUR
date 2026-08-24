@@ -3,7 +3,7 @@ import BookingPage from '../../src/views/BookingPage'
 
 export default function Page() {
   return (
-    <ProtectedRoute allowedRoles={['tutor', 'parent']}>
+    <ProtectedRoute allowedRoles={['tutor', 'parent']} gateExpiredTutor>
       <BookingPage />
     </ProtectedRoute>
   )

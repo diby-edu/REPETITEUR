@@ -4,7 +4,7 @@ import TutorDashboardPage from '../../../src/views/TutorDashboardPage'
 
 export default function Page() {
   return (
-    <ProtectedRoute allowedRoles={['tutor']}>
+    <ProtectedRoute allowedRoles={['tutor']} gateExpiredTutor>
       <Suspense>
         <TutorDashboardPage />
       </Suspense>

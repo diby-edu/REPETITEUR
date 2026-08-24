@@ -33,6 +33,9 @@ export default function SubscriptionPage() {
   const sub = currentUser?.subscription
   const daysLeft = getSubscriptionDaysLeft(sub?.endDate)
   const currentPlan = sub?.plan || 'gratuit'
+  const subExpired = !!sub && sub.plan !== 'gratuit' &&
+    (sub.status === 'expired' ||
+     (sub.endDate && new Date(sub.endDate) < new Date(new Date().toDateString())))
 
   const handleChoosePlan = (planId) => {
     if (planId === currentPlan && sub?.status === 'active') return
@@ -152,6 +155,23 @@ export default function SubscriptionPage() {
           <h1 className="font-display text-3xl font-bold text-gray-900 mb-2">Choisissez votre abonnement</h1>
           <p className="text-gray-500">Développez votre activité de répétiteur avec le bon plan</p>
         </div>
+
+        {/* Accès restreint — abonnement expiré */}
+        {subExpired && (
+          <div className="card mb-8 border-red-200 bg-red-50">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={22} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-800">Accès restreint — votre abonnement a expiré</p>
+                <p className="text-sm text-red-700 mt-0.5">
+                  Votre profil est masqué des recherches et vos contrats actifs ont été résiliés.
+                  Renouvelez ci-dessous pour réactiver votre espace de travail. En attendant, vous
+                  gardez l'accès à vos notifications et à votre messagerie.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Current plan */}
         {sub && (

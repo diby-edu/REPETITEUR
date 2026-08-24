@@ -19,6 +19,7 @@ function mapTutor(profile, tutor) {
     city: profile.city,
     quartier: profile.quartier,
     avatarColor: profile.avatar_color,
+    avatarUrl: profile.avatar_url,
     joinDate: profile.join_date,
     bio: tutor.bio,
     subjects: tutor.subjects || [],
@@ -66,6 +67,7 @@ function mapPublicTutor(r) {
     city: r.city,
     quartier: r.quartier,
     avatarColor: r.avatar_color,
+    avatarUrl: r.avatar_url,
     joinDate: r.join_date,
     bio: r.bio,
     subjects: r.subjects || [],
@@ -817,13 +819,13 @@ export function AppProvider({ children }) {
     // Vue publique : pas d'email/téléphone d'un autre utilisateur.
     const { data } = await supabase
       .from('public_profiles')
-      .select('id, first_name, last_name, avatar_color, city')
+      .select('id, first_name, last_name, avatar_color, avatar_url, city')
       .eq('id', id)
       .single()
     if (data) {
       const profile = {
         id: data.id, firstName: data.first_name, lastName: data.last_name,
-        avatarColor: data.avatar_color, city: data.city,
+        avatarColor: data.avatar_color, avatarUrl: data.avatar_url, city: data.city,
       }
       setProfiles(prev => ({ ...prev, [id]: profile }))
       return profile

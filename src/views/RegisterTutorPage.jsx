@@ -8,6 +8,7 @@ import { SUBJECTS, LEVELS, QUARTIERS_BY_CITY } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
 import CityCombobox from '../components/common/CityCombobox'
 import OtpInput from '../components/common/OtpInput'
+import AvatarUpload from '../components/common/AvatarUpload'
 import {
   CheckCircle, ChevronLeft, Upload, Clock, Home, Building2,
   Users, Wifi, FileText, Plus, Camera, RefreshCw,
@@ -129,6 +130,7 @@ export default function RegisterTutorPage() {
     diplomas: [{ name: '', file: null, path: null, uploading: false }],
     selfieDataUrl: null,
     avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+    avatarUrl: '',
   })
 
   const set = (key, val) => setForm(p => ({ ...p, [key]: val }))
@@ -307,7 +309,7 @@ export default function RegisterTutorPage() {
 
     const docs = currentUser.documents || {}
     const quartierOk = QUARTIERS_BY_CITY[currentUser.city]?.length > 0 ? !!currentUser.quartier : true
-    const hasBasicInfo = !!(currentUser.firstName && currentUser.lastName && currentUser.phone && currentUser.city && currentUser.bio?.trim() && quartierOk)
+    const hasBasicInfo = !!(currentUser.firstName && currentUser.lastName && currentUser.phone && currentUser.city && currentUser.bio?.trim() && currentUser.avatarUrl && quartierOk)
     const primaireOnly = currentUser.levels?.length === 1 && currentUser.levels[0] === 'Primaire'
     const hasExpertise = currentUser.levels?.length > 0 && (primaireOnly || currentUser.subjects?.length > 0) && currentUser.monthlyRate > 0 && currentUser.modalities?.length > 0
     const hasId = docs.idType === 'cni' ? !!(docs.cniRecto && docs.cniVerso) : docs.idType === 'passport' ? !!docs.passport : false
@@ -331,6 +333,7 @@ export default function RegisterTutorPage() {
       documents: docs,
       diplomas: docs.diplomes?.length ? docs.diplomes.map(d => ({ name: d.name, path: d.path, file: null, uploading: false })) : f.diplomas,
       avatarColor: currentUser.avatarColor || f.avatarColor,
+      avatarUrl: currentUser.avatarUrl || f.avatarUrl,
     }))
 
     if (!hasBasicInfo) setStep(2)
@@ -452,7 +455,7 @@ export default function RegisterTutorPage() {
   const canAdvance = (() => {
     if (step === 2) {
       const quartierOk = QUARTIERS_BY_CITY[form.city]?.length > 0 ? !!form.quartier : true
-      return !!(form.firstName && form.lastName && form.phone && form.city && form.bio.trim() && quartierOk)
+      return !!(form.firstName && form.lastName && form.phone && form.city && form.bio.trim() && form.avatarUrl && quartierOk)
     }
     if (step === 3) return (isPrimaireOnly || form.subjects.length > 0) && form.levels.length > 0 && form.monthlyRate && form.modalities.length > 0
     if (step === 4) {
@@ -474,6 +477,7 @@ export default function RegisterTutorPage() {
       const r1 = await supabase.from('profiles').update({
         first_name: form.firstName, last_name: form.lastName, phone: form.phone || null,
         city: form.city, quartier: form.quartier || null, avatar_color: form.avatarColor,
+        avatar_url: form.avatarUrl || null,
       }).eq('id', currentUser.id)
       const r2 = await supabase.from('tutors').update({ bio: form.bio }).eq('id', currentUser.id)
       err = r1.error || r2.error
@@ -647,6 +651,15 @@ export default function RegisterTutorPage() {
           {step === 2 && (
             <div className="space-y-4">
               <h2 className="font-semibold text-lg text-gray-800">Informations personnelles</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Photo de profil *</label>
+                <AvatarUpload
+                  user={{ firstName: form.firstName, lastName: form.lastName, avatarColor: form.avatarColor, avatarUrl: form.avatarUrl }}
+                  userId={currentUser?.id}
+                  required
+                  onUploaded={url => set('avatarUrl', url)}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="reg-fn" className="block text-sm font-medium text-gray-700 mb-1.5">Prénom *</label>

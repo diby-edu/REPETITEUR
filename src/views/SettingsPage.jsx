@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { CITIES, LEVELS } from '../data/constants'
 import { getDocumentApprovalProgress } from '../utils/helpers'
 import Avatar from '../components/common/Avatar'
+import AvatarUpload from '../components/common/AvatarUpload'
 import OffersEditor from '../components/tutor/OffersEditor'
 import DashboardLayout from '../components/layout/DashboardLayout'
 import {
@@ -409,8 +410,13 @@ export default function SettingsPage() {
             {/* Profile tab */}
             {activeTab === 'Profil' && (
               <div className="card">
-                <div className="flex items-center gap-4 mb-6 pb-5 border-b border-gray-100">
-                  <Avatar user={currentUser} size="xl" />
+                <div className="mb-6 pb-5 border-b border-gray-100 space-y-4">
+                  <AvatarUpload
+                    user={currentUser}
+                    userId={currentUser?.id}
+                    required={currentUser?.role === 'tutor'}
+                    onUploaded={async (url) => { await updateCurrentUser({ avatarUrl: url }); refreshCurrentUser?.() }}
+                  />
                   <div>
                     <p className="font-semibold text-gray-900 text-lg">{currentUser?.firstName} {currentUser?.lastName}</p>
                     <p className="text-gray-500 text-sm">{currentUser?.email}</p>

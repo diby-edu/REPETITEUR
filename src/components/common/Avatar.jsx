@@ -12,6 +12,17 @@ export default function Avatar({ user, size = 'md', className = '' }) {
 
   const initials = getInitials(user?.firstName, user?.lastName)
   const color = user?.avatarColor || '#E87722'
+  const photo = user?.avatarUrl
+
+  if (photo) {
+    return (
+      <img
+        src={photo}
+        alt={`${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Photo de profil'}
+        className={`${sizes[size]} rounded-full object-cover flex-shrink-0 bg-gray-100 ${className}`}
+      />
+    )
+  }
 
   return (
     <div

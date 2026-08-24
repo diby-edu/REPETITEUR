@@ -29,6 +29,7 @@ export function AuthProvider({ children }) {
       city: profile.city,
       quartier: profile.quartier,
       avatarColor: profile.avatar_color,
+      avatarUrl: profile.avatar_url,
       joinDate: profile.join_date,
       // Données parent
       subjectsNeeded: profile.subjects_needed || [],
@@ -168,6 +169,7 @@ export function AuthProvider({ children }) {
     if (updates.quartier !== undefined) profileUpdates.quartier = updates.quartier
     if (updates.childLevels !== undefined) profileUpdates.child_levels = updates.childLevels
     if (updates.openToContact !== undefined) profileUpdates.open_to_contact = updates.openToContact
+    if (updates.avatarUrl !== undefined) profileUpdates.avatar_url = updates.avatarUrl
 
     if (Object.keys(profileUpdates).length > 0) {
       await supabase.from('profiles').update(profileUpdates).eq('id', currentUser.id)

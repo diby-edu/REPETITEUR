@@ -378,10 +378,11 @@ export default function TutorDashboardPage() {
           {tutor.verificationStatus === 'rejected' && (
             <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
               <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="text-sm font-semibold text-red-800">Dossier rejeté</p>
                 <p className="text-sm text-red-700">{tutor.rejectionReason || "Vos documents n'ont pas pu être validés."}</p>
               </div>
+              <Link href="/parametres?tab=Documents" className="text-xs font-semibold text-red-700 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg whitespace-nowrap">Corriger mes documents</Link>
             </div>
           )}
 
@@ -736,10 +737,17 @@ export default function TutorDashboardPage() {
                         })}
                       </div>
                     </div>
-                    {tutor.verificationStatus === 'rejected' && tutor.rejectionReason && (
-                      <div className="bg-red-50 rounded-xl p-3">
-                        <p className="text-xs text-red-700"><strong>Motif du rejet :</strong> {tutor.rejectionReason}</p>
-                      </div>
+                    {tutor.verificationStatus === 'rejected' && (
+                      <>
+                        {tutor.rejectionReason && (
+                          <div className="bg-red-50 rounded-xl p-3">
+                            <p className="text-xs text-red-700"><strong>Motif du rejet :</strong> {tutor.rejectionReason}</p>
+                          </div>
+                        )}
+                        <Link href="/parametres?tab=Documents" className="btn-primary w-full text-sm flex items-center justify-center gap-2">
+                          Corriger et renvoyer mes documents
+                        </Link>
+                      </>
                     )}
                   </>
                 )

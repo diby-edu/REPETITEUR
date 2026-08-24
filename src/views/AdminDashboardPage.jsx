@@ -513,6 +513,7 @@ export default function AdminDashboardPage() {
   // ── Derived ──────────────────────────────────────────────────
   const pending  = tutors.filter(t => t.verificationStatus === 'pending')
   const verified = tutors.filter(t => t.verificationStatus === 'verified')
+  const activeTutors = tutors.filter(t => t.isActive)   // visibles (abonnement actif + vérifiés)
   const rejected = tutors.filter(t => t.verificationStatus === 'rejected')
   // Dossier traité rouvert pour re-consultation/re-décision (toujours frais).
   const reopenedTutor = reopenedId ? tutors.find(t => t.id === reopenedId) : null
@@ -550,7 +551,7 @@ export default function AdminDashboardPage() {
 
   const totalMonthlyRevenue = (standardSubs.length * 3000) + (premiumSubs.length * 5000)
   const stats = [
-    { label: 'Répétiteurs actifs', value: verified.length,       emoji: '🎓', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: `${tutors.length} inscrits · ${pending.length} en attente`, deltaClass: 'text-gray-400' },
+    { label: 'Répétiteurs actifs', value: activeTutors.length,   emoji: '🎓', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: `${tutors.length} inscrits · ${pending.length} en attente`, deltaClass: 'text-gray-400' },
     { label: 'Parents inscrits',   value: parents.length,        emoji: '👨‍👩‍👧', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: parentMonthCount > 0 ? `+${parentMonthCount} ce mois` : '→ stable', deltaClass: parentMonthCount > 0 ? 'text-green-600' : 'text-gray-400' },
     { label: 'Séances ce mois',    value: monthSessionCount,     emoji: '📅', bg: 'bg-blue-50',      bar: 'bg-blue-500',  delta: sessionStats.toConfirm > 0 ? `${sessionStats.toConfirm} à confirmer` : '→ stable', deltaClass: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-400' },
     { label: 'CA FCFA (mois)',     value: totalMonthlyRevenue > 0 ? totalMonthlyRevenue.toLocaleString('fr-FR') : '0', emoji: '💰', bg: 'bg-accent-50', bar: 'bg-accent', bigVal: totalMonthlyRevenue >= 100000, delta: `${activeSubscriptions.length} abonnements actifs`, deltaClass: 'text-green-600' },
@@ -699,7 +700,7 @@ export default function AdminDashboardPage() {
             {/* KPI tiles */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Répétiteurs actifs', value: verified.length, icon: GraduationCap, color: '#2D6A4F', bg: '#f0fdf4', delta: weekStats.tutors > 0 ? `↑ +${weekStats.tutors} cette semaine` : '→ stable', pos: weekStats.tutors > 0 },
+                { label: 'Répétiteurs actifs', value: activeTutors.length, icon: GraduationCap, color: '#2D6A4F', bg: '#f0fdf4', delta: `${tutors.length} inscrit${tutors.length > 1 ? 's' : ''} · ${pending.length} en attente`, pos: false },
                 { label: 'Parents inscrits',   value: parents.length,  icon: Users,         color: '#3b82f6', bg: '#eff6ff', delta: parentMonthCount > 0 ? `↑ +${parentMonthCount} ce mois` : '→ stable', pos: parentMonthCount > 0 },
                 { label: 'Contrats actifs',    value: engStats.active, icon: FileText,      color: '#E87722', bg: '#fff7ed', delta: engStats.pending > 0 ? `${engStats.pending} en attente` : '→ stable', pos: false },
                 { label: 'CA mensuel (FCFA)',  value: totalMonthlyRevenue > 0 ? formatFCFA(totalMonthlyRevenue) : '0', icon: Wallet, color: '#F4A61D', bg: '#fffbeb', delta: `${activeSubscriptions.length} abonnements actifs`, pos: activeSubscriptions.length > 0, big: totalMonthlyRevenue >= 100000 },

@@ -55,7 +55,7 @@ export default function ParentDashboardPage() {
     getUserConversations, getUserEngagements, getAllUserSessions,
     loadUserConversations, loadUserEngagements, loadAllUserSessions,
     loadUserFavorites, getUserFavorites, loadUserNotifications,
-    subscribeToNotifications, getTutor, getOrCreateConversation,
+    subscribeToNotifications, subscribeToEngagements, getTutor, getOrCreateConversation,
     reportSession, declarePayment, endEngagement, setSessionsDone, runMaintenanceTasks, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
@@ -102,7 +102,9 @@ export default function ParentDashboardPage() {
     loadUserFavorites(parent.id)
     loadUserNotifications(parent.id)
     runMaintenanceTasks()
-    return subscribeToNotifications(parent.id)
+    const unsubNotif = subscribeToNotifications(parent.id)
+    const unsubEng = subscribeToEngagements(parent.id, 'parent')
+    return () => { unsubNotif?.(); unsubEng?.() }
   }, [parent?.id])
 
   // Paiements confirmés (dépenses réelles — postpayé)

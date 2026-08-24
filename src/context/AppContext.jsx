@@ -257,6 +257,7 @@ export function AppProvider({ children }) {
   const [payments, setPayments] = useState({})    // keyed by engagementId
   const [toast, setToast] = useState(null)
   const notifChannelRef = useRef(null)
+  const engChannelRef = useRef(null)
 
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type, id: Date.now() })
@@ -740,6 +741,23 @@ export function AppProvider({ children }) {
     return () => supabase.removeChannel(channel)
   }, [])
 
+  // Temps réel des contrats : recharge dès qu'un engagement de l'utilisateur
+  // change (ex. le parent valide une séance → le répétiteur voit le compteur
+  // se mettre à jour sans actualiser).
+  const subscribeToEngagements = useCallback((userId, role) => {
+    if (engChannelRef.current) supabase.removeChannel(engChannelRef.current)
+    const column = role === 'tutor' ? 'tutor_id' : 'parent_id'
+    const channel = supabase
+      .channel(`engagements:${userId}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'engagements',
+        filter: `${column}=eq.${userId}`,
+      }, () => { loadUserEngagements(userId, role) })
+      .subscribe()
+    engChannelRef.current = channel
+    return () => supabase.removeChannel(channel)
+  }, [loadUserEngagements])
+
   // ── FAVORIS ─────────────────────────────────────────────────
 
   const loadUserFavorites = useCallback(async (userId) => {
@@ -1132,7 +1150,7 @@ export function AppProvider({ children }) {
 
       // Notifications
       loadUserNotifications, getUserNotifications, getUnreadNotifCount,
-      markNotificationsRead, deleteNotification, subscribeToNotifications,
+      markNotificationsRead, deleteNotification, subscribeToNotifications, subscribeToEngagements,
 
       // Favoris
       loadUserFavorites, toggleFavorite, getUserFavorites, isFavorite,

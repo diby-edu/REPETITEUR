@@ -47,7 +47,7 @@ export default function TutorDashboardPage() {
   const { currentUser } = useAuth()
   const {
     getUserConversations, getUserNotifications, getUnreadNotifCount,
-    loadUserConversations, loadUserNotifications, subscribeToNotifications,
+    loadUserConversations, loadUserNotifications, subscribeToNotifications, subscribeToEngagements,
     getOrCreateConversation,
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
@@ -104,7 +104,9 @@ export default function TutorDashboardPage() {
     loadAllUserSessions(tutor.id, 'tutor')
     loadUserNotifications(tutor.id)
     runMaintenanceTasks()
-    return subscribeToNotifications(tutor.id)
+    const unsubNotif = subscribeToNotifications(tutor.id)
+    const unsubEng = subscribeToEngagements(tutor.id, 'tutor')
+    return () => { unsubNotif?.(); unsubEng?.() }
   }, [tutor?.id])
 
   // Parents cherchant un répétiteur dans la même ville

@@ -259,9 +259,12 @@ create trigger protect_tutor_privileged_fields
 create or replace function public.protect_engagement_fields()
 returns trigger as $$
 begin
-  if auth.role() = 'service_role' or public.is_admin() then
-    return new;
-  end if;
+  -- Bypass : tâches système / recalcul / admin / service_role
+  if coalesce(current_setting('app.system_task', true), '') = '1' then return new; end if;
+  if coalesce(current_setting('app.rating_recompute', true), '') = '1' then return new; end if;
+  if auth.role() = 'service_role' then return new; end if;
+  if public.is_admin() then return new; end if;
+
   -- Champs immuables côté client
   new.parent_id    := old.parent_id;
   new.tutor_id     := old.tutor_id;
@@ -269,10 +272,32 @@ begin
   new.monthly_rate := old.monthly_rate;
   new.start_date   := old.start_date;
   new.created_at   := old.created_at;
+
   -- « Séances validées » : réservé au PARENT du contrat (cf. Lot 5B).
-  if auth.uid() <> old.parent_id then
+  if auth.uid() is distinct from old.parent_id then
     new.sessions_done := old.sessions_done;
   end if;
+
+  -- end_date : jamais modifiable directement (renouvellement = système)
+  if new.end_date is distinct from old.end_date then
+    raise exception 'end_date non modifiable directement (engagement %)', old.id
+      using errcode = 'check_violation';
+  end if;
+
+  -- status : uniquement les transitions légitimes, par l'acteur autorisé
+  if new.status is distinct from old.status then
+    if old.status = 'pending' and new.status = 'active'
+       and auth.uid() = old.tutor_id then
+      null;  -- acceptation par le répétiteur
+    elsif new.status = 'ended' and old.status in ('pending', 'active')
+          and auth.uid() in (old.parent_id, old.tutor_id) then
+      null;  -- refus / annulation / résiliation par une partie
+    else
+      raise exception 'transition de statut interdite : % -> % (engagement %)',
+        old.status, new.status, old.id using errcode = 'check_violation';
+    end if;
+  end if;
+
   return new;
 end;
 $$ language plpgsql security definer set search_path = public;

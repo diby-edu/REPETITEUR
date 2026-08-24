@@ -297,6 +297,8 @@ $$ language plpgsql security definer;
 -- ============================================================
 create or replace function public.expire_ended_engagements() returns void as $$
 begin
+  perform set_config('app.system_task', '1', true);
+
   update public.engagements
   set status = 'ended', updated_at = now()
   where status = 'active'
@@ -462,6 +464,9 @@ declare
   t   public.profiles%rowtype;
 begin
   if new.status = 'confirmed' and old.status = 'parent_declared' then
+    -- Autorise cette fonction système à modifier end_date/status de l'engagement
+    perform set_config('app.system_task', '1', true);
+
     select * into eng from public.engagements where id = new.engagement_id;
     select * into t   from public.profiles    where id = eng.tutor_id;
 

@@ -29,7 +29,9 @@ function AfricanPattern() {
 
 export default function HomePage() {
   const router = useRouter()
-  const { getActiveTutors } = useApp()
+  const { getActiveTutors, loadRecentReviews } = useApp()
+  const [recentReviews, setRecentReviews] = useState([])
+  useEffect(() => { loadRecentReviews(6).then(setRecentReviews) }, [])
   const { currentUser, isAuthenticated } = useAuth()
   const [search, setSearch] = useState({ query: '', city: '' })
 
@@ -41,9 +43,15 @@ export default function HomePage() {
   }, [isAuthenticated, currentUser, router])
 
   const activeTutors = getActiveTutors()
+  // Répétiteurs mis en avant : tous les actifs vérifiés, Premium en tête,
+  // puis les mieux notés (et non plus les Premium uniquement).
   const featuredTutors = activeTutors
-    .filter(t => t.subscription?.plan === 'premium')
-    .sort((a, b) => b.rating - a.rating)
+    .slice()
+    .sort((a, b) => {
+      const pa = a.subscription?.plan === 'premium' ? 1 : 0
+      const pb = b.subscription?.plan === 'premium' ? 1 : 0
+      return (pb - pa) || (b.rating - a.rating) || (b.reviewCount - a.reviewCount)
+    })
     .slice(0, 4)
 
   const handleSearch = (e) => {
@@ -185,8 +193,8 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-10">
               <div>
-                <h2 className="font-display text-3xl font-bold text-gray-900">Répétiteurs Premium</h2>
-                <p className="text-gray-500 mt-1">Nos meilleurs répétiteurs vérifiés et bien notés</p>
+                <h2 className="font-display text-3xl font-bold text-gray-900">Nos répétiteurs</h2>
+                <p className="text-gray-500 mt-1">Des profils vérifiés, bien notés et proches de chez vous</p>
               </div>
               <Link href="/recherche" className="hidden sm:flex items-center gap-1 text-primary font-medium hover:underline text-sm">
                 Voir tous <ChevronRight size={16} />
@@ -226,35 +234,38 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="py-16 px-4 sm:px-6 bg-white">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-10">
-            <h2 className="font-display text-3xl font-bold text-gray-900">Ce que disent nos parents</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-5">
-            {[
-              { name: 'A. Ouédraogo', city: 'Abidjan — Cocody', text: 'Grâce à MonRépétiteur, mon fils est passé de 8 à 16 en mathématiques en 2 mois. Vraiment incroyable !', rating: 5 },
-              { name: 'O. Koné', city: 'Bouaké', text: 'La plateforme est très facile à utiliser. J\'ai trouvé une excellente répétitrice de français en 10 minutes.', rating: 5 },
-              { name: 'M. Traoré', city: 'Abidjan — Yopougon', text: 'Les répétiteurs sont vraiment vérifiés et professionnels. Je recommande à tous les parents !', rating: 5 },
-            ].map((t, i) => (
-              <div key={i} className="card">
-                <StarRating rating={t.rating} showNumber={false} />
-                <p className="text-gray-600 text-sm mt-3 mb-4 leading-relaxed italic">"{t.text}"</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-secondary-50 rounded-full flex items-center justify-center text-secondary font-bold text-xs">
-                    {t.name.charAt(0)}
+      {/* Avis réels des parents */}
+      {recentReviews.length > 0 && (
+        <section className="py-16 px-4 sm:px-6 bg-white">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-10">
+              <h2 className="font-display text-3xl font-bold text-gray-900">Ce que disent nos parents</h2>
+              <p className="text-gray-500 mt-1">Des avis vérifiés laissés par de vraies familles</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-5">
+              {recentReviews.slice(0, 3).map(r => {
+                const t = activeTutors.find(x => x.id === r.tutorId)
+                const author = r.anonymous ? 'Parent vérifié' : r.parentName
+                return (
+                  <div key={r.id} className="card">
+                    <StarRating rating={r.rating} showNumber={false} />
+                    <p className="text-gray-600 text-sm mt-3 mb-4 leading-relaxed italic">"{r.comment}"</p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-secondary-50 rounded-full flex items-center justify-center text-secondary font-bold text-xs flex-shrink-0">
+                        {(author || '?').charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{author}</p>
+                        {t && <p className="text-xs text-gray-400 truncate">à propos de {t.firstName} {t.lastName}</p>}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{t.name}</p>
-                    <p className="text-xs text-gray-400">{t.city}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+                )
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* CTA */}
       <section className="py-16 px-4 sm:px-6 bg-gradient-to-br from-primary to-primary-600">

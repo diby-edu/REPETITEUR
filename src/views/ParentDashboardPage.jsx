@@ -187,9 +187,11 @@ export default function ParentDashboardPage() {
     .reduce((sum, p) => sum + (p.amount || p.engagement?.monthly_rate || 0), 0)
   const expectedSpend     = activeEngagements.reduce((sum, e) => sum + (e.monthlyRate || 0), 0)
   const favoriteIds       = new Set(favoriteTutors.map(t => t.id))
+  // Séances restantes du forfait ce mois = total prévu − validées.
+  const sessionsRemaining = Math.max(0, sessionsTargetTotal - sessionsDoneTotal)
 
   const stats = [
-    { label: 'Séances planifiées',  value: upcomingSessions.length,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: upcomingSessions.length > 0 ? '↑ à venir' : '→ stable',       deltaClass: upcomingSessions.length > 0 ? 'text-green-600' : 'text-gray-400' },
+    { label: 'Séances restantes',  value: sessionsRemaining,   emoji: '📅', bg: 'bg-primary-50',   bar: 'bg-primary',   delta: sessionsTargetTotal > 0 ? `sur ${sessionsTargetTotal} ce mois` : '→ stable',       deltaClass: 'text-gray-400' },
     { label: 'Contrats actifs',     value: activeEngagements.length,  emoji: '📋', bg: 'bg-secondary-50', bar: 'bg-secondary', delta: '→ stable',                                                    deltaClass: 'text-gray-400' },
     { label: 'Séances validées',    value: sessionsTargetTotal > 0 ? `${sessionsDoneTotal}/${sessionsTargetTotal}` : '0', emoji: '📚', bg: 'bg-blue-50', bar: 'bg-blue-500', delta: sessionsTargetTotal > 0 ? 'à cocher au fil du mois' : '→ stable', deltaClass: 'text-gray-400' },
     { label: 'Dépenses FCFA (mois)', value: confirmedSpend > 0 ? confirmedSpend.toLocaleString('fr-FR') : '0', emoji: '💸', bg: 'bg-orange-50', bar: 'bg-orange-500', bigVal: confirmedSpend >= 100000, delta: paymentDueEngagements.length > 0 ? `${paymentDueEngagements.length} règlement${paymentDueEngagements.length > 1 ? 's' : ''} à venir` : expectedSpend > 0 ? `À régler ce mois : ${expectedSpend.toLocaleString('fr-FR')} FCFA` : '→ stable', deltaClass: paymentDueEngagements.length > 0 ? 'text-orange-500' : 'text-gray-400' },

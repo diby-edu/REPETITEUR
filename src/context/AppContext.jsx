@@ -639,6 +639,18 @@ export function AppProvider({ children }) {
 
   const getTutorReviews = (tutorId) => reviews.filter(r => r.tutorId === tutorId)
 
+  // Avis récents (tous répétiteurs confondus) pour la landing page.
+  const loadRecentReviews = useCallback(async (limit = 6) => {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('*')
+      .not('comment', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) { console.error('loadRecentReviews:', error); return [] }
+    return data.map(mapReview).filter(r => r.comment?.trim())
+  }, [])
+
   const addReview = useCallback(async (reviewData) => {
     const { data, error } = await supabase
       .from('reviews')
@@ -1163,7 +1175,7 @@ export function AppProvider({ children }) {
       loadUserBookings, getUserBookings, createBooking, updateBookingStatus,
 
       // Avis
-      loadTutorReviews, getTutorReviews, addReview, addTutorResponse,
+      loadTutorReviews, getTutorReviews, loadRecentReviews, addReview, addTutorResponse,
 
       // Notifications
       loadUserNotifications, getUserNotifications, getUnreadNotifCount,

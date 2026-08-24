@@ -771,7 +771,7 @@ export function AppProvider({ children }) {
       .subscribe()
     engChannelRef.current = channel
     return () => supabase.removeChannel(channel)
-  }, [loadUserEngagements])
+  }, [])
 
   // Temps réel des avis d'un répétiteur (sa fiche + son dashboard « Vos avis »).
   const subscribeToReviews = useCallback((tutorId) => {
@@ -785,7 +785,7 @@ export function AppProvider({ children }) {
       .subscribe()
     reviewChannelRef.current = channel
     return () => supabase.removeChannel(channel)
-  }, [loadTutorReviews])
+  }, [])
 
   // ── FAVORIS ─────────────────────────────────────────────────
 

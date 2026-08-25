@@ -62,6 +62,13 @@ export default function TutorDashboardPage() {
   const searchParams = useSearchParams()
   const tutor = currentUser
 
+  const [referral, setReferral] = useState(null)
+  const [refCopied, setRefCopied] = useState(false)
+  useEffect(() => {
+    if (!tutor?.id) return
+    supabase.rpc('my_referral_stats').then(({ data }) => setReferral(data?.[0] || null))
+  }, [tutor?.id])
+
   const [showConfetti, setShowConfetti] = useState(false)
   useEffect(() => {
     if (searchParams.get('welcome') === '1') {
@@ -810,6 +817,60 @@ export default function TutorDashboardPage() {
             )}
           </div>
         </div>
+
+        {/* ── Parrainage ──────────────────────────────────────────── */}
+        {referral && (
+          <div className="card mt-6 border-accent-200 bg-gradient-to-br from-accent-50/60 to-primary-50/40">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <span className="text-lg">🎁</span> Parrainez & gagnez des mois gratuits
+              </h2>
+              {referral.is_founder && (
+                <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-accent text-white">★ Fondateur</span>
+              )}
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Invitez d'autres répétiteurs. Dès que <strong>{referral.threshold}</strong> filleuls sont abonnés,
+              vous gagnez <strong>1 mois offert</strong> (répétable).
+              {!referral.has_paid && <span className="text-gray-500"> Vos mois gagnés s'appliqueront à votre 1er paiement.</span>}
+            </p>
+
+            {/* Lien de parrainage */}
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Votre lien de parrainage</p>
+            <div className="flex gap-2 mb-4">
+              <input
+                readOnly
+                value={typeof window !== 'undefined' ? `${window.location.origin}/inscription/repetiteur?ref=${referral.code}` : ''}
+                onFocus={e => e.target.select()}
+                className="input-field text-sm flex-1 bg-white/70"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const link = `${window.location.origin}/inscription/repetiteur?ref=${referral.code}`
+                  navigator.clipboard?.writeText(link)
+                  setRefCopied(true); setTimeout(() => setRefCopied(false), 2000)
+                }}
+                className="btn-primary text-sm px-4 whitespace-nowrap"
+              >
+                {refCopied ? 'Copié !' : 'Copier'}
+              </button>
+            </div>
+
+            {/* Progression vers la prochaine récompense */}
+            <div className="flex items-center gap-1.5 mb-1.5">
+              {Array.from({ length: referral.threshold }).map((_, i) => (
+                <div key={i} className={`h-2 flex-1 rounded-full ${i < (referral.qualified_count % referral.threshold) ? 'bg-secondary' : 'bg-gray-200'}`} />
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              <strong className="text-gray-800">{referral.qualified_count}</strong> filleul{referral.qualified_count > 1 ? 's' : ''} abonné{referral.qualified_count > 1 ? 's' : ''}
+              {referral.pending_count > 0 && <> · {referral.pending_count} en attente de paiement</>}
+              {referral.rewards_granted > 0 && <> · <strong className="text-secondary">{referral.rewards_granted} mois gagné{referral.rewards_granted > 1 ? 's' : ''}</strong></>}
+              {referral.banked_days > 0 && <> · {Math.round(referral.banked_days / 30)} mois en réserve</>}
+            </p>
+          </div>
+        )}
 
         {/* ── Vos avis ────────────────────────────────────────────── */}
         <div className="card mt-6">

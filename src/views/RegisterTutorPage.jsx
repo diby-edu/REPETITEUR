@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -89,6 +89,27 @@ async function uploadDoc(userId, file, filename) {
 export default function RegisterTutorPage() {
   const { verifyOtp, refreshCurrentUser, currentUser } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [founderSpots, setFounderSpots] = useState(null)
+
+  // Capture du code de parrainage (?ref=) — persisté pendant l'OTP.
+  useEffect(() => {
+    const r = searchParams.get('ref')
+    if (r) { try { localStorage.setItem('ref_code', r) } catch {} }
+    supabase.rpc('founder_spots_left').then(({ data }) => setFounderSpots(data))
+  }, [])
+
+  // Dès que le compte répétiteur existe → enregistrer son parrain (une fois).
+  useEffect(() => {
+    if (!currentUser?.id || currentUser.role !== 'tutor') return
+    let code = null
+    try { code = localStorage.getItem('ref_code') } catch {}
+    if (code) {
+      supabase.rpc('set_referrer', { p_code: code }).finally(() => {
+        try { localStorage.removeItem('ref_code') } catch {}
+      })
+    }
+  }, [currentUser?.id])
 
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -534,6 +555,16 @@ export default function RegisterTutorPage() {
           {/* ── Étape 0 : Compte ──────────────────────────── */}
           {step === 0 && (
             <div className="space-y-4">
+              {founderSpots > 0 && (
+                <div className="rounded-xl border border-accent-200 bg-accent-50 px-4 py-3">
+                  <p className="text-sm font-bold text-accent-800">
+                    🎉 Offre fondateur — plus que {founderSpots} place{founderSpots > 1 ? 's' : ''} !
+                  </p>
+                  <p className="text-xs text-accent-700 mt-0.5">
+                    Les {founderSpots > 1 ? 'premiers' : 'derniers'} répétiteurs inscrits sont <strong>gratuits jusqu'à leur 1er élève</strong>. Ne tardez pas.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 bg-primary-50 rounded-xl flex items-center justify-center">
                   <Mail size={16} className="text-primary" />

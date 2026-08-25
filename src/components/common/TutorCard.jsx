@@ -31,6 +31,8 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
   const initials = getInitials(tutor.firstName, tutor.lastName)
   const gradient = `linear-gradient(150deg, ${tutor.avatarColor || '#2D6A4F'}, rgba(0,0,0,.3))`
   const href = `/repetiteur/${tutor.id}`
+  // Recrutable = vérifié & non suspendu (visibilité gratuite)
+  const recruitable = tutor.verificationStatus === 'verified' && !tutor.suspended
 
   const Photo = ({ className, rounded = 'rounded-none' }) => (
     <div className={`relative overflow-hidden ${className}`}>
@@ -71,13 +73,13 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-display font-bold text-gray-900 text-base group-hover:text-primary transition-colors truncate">{tutor.firstName} {tutor.lastName}</h3>
-              {tutor.isActive && <DispoPill />}
+              {recruitable && <DispoPill />}
               {isPremium && <span className="text-[10px] font-bold bg-accent text-white px-2 py-0.5 rounded-full">★ Premium</span>}
             </div>
-            <p className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
+            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
               <span className="flex items-center gap-1"><MapPin size={12} />{tutor.quartier}, {tutor.city}</span>
               {tutor.rating > 0 && <><span>·</span><StarRating rating={tutor.rating} count={tutor.reviewCount} size={12} /></>}
-            </p>
+            </div>
             <div className="flex flex-wrap gap-1 mt-2">
               {tutor.subjects.slice(0, 3).map(s => <span key={s} className="text-[11px] bg-primary-50 text-primary-600 font-medium px-2 py-0.5 rounded-full">{s}</span>)}
               {tutor.levels?.map(l => <span key={l} className="text-[11px] bg-secondary-50 text-secondary-600 font-medium px-2 py-0.5 rounded-full">{l}</span>)}
@@ -100,7 +102,7 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
           <Photo className="absolute inset-0 w-full h-full" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent pointer-events-none" />
           <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">
-            {tutor.isActive ? <DispoPill /> : <span />}
+            {recruitable ? <DispoPill /> : <span />}
             {isVerified && <VerifCheck className="w-6 h-6" />}
           </div>
           {isPremium && <span className="absolute bottom-2.5 left-2.5 text-[10px] font-bold bg-accent text-white px-2 py-0.5 rounded-full shadow-sm">★ Premium</span>}

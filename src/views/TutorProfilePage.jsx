@@ -118,7 +118,10 @@ export default function TutorProfilePage() {
   }
 
   const tabs = ['profil', 'avis']
-  const canRecruit = tutor.isActive && (!isAuthenticated || currentUser?.role === 'parent')
+  // Recrutable = vérifié & non suspendu (visibilité gratuite ; l'abonnement se
+  // paie au moment où le répétiteur accepte la demande, pas ici).
+  const recruitable = tutor.verificationStatus === 'verified' && !tutor.suspended
+  const canRecruit = recruitable && (!isAuthenticated || currentUser?.role === 'parent')
   const initials = `${tutor.firstName?.[0] || ''}${tutor.lastName?.[0] || ''}`.toUpperCase()
 
   return (
@@ -175,7 +178,7 @@ export default function TutorProfilePage() {
                     <Star size={13} className="fill-white" /> {tutor.rating.toFixed(1)} ({tutor.reviewCount} avis)
                   </span>
                 )}
-                {tutor.isActive
+                {recruitable
                   ? <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 rounded-full px-3 py-1"><span className="w-2 h-2 rounded-full bg-green-300" /> Disponible</span>
                   : <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-black/20 rounded-full px-3 py-1">Indisponible</span>}
                 {isPremium && (
@@ -531,13 +534,13 @@ export default function TutorProfilePage() {
                 </form>
               </div>
             )}
-            {!tutor.isActive && (
+            {!recruitable && (
               <div className="card bg-gray-50 text-center py-6">
                 <InactiveBadge />
                 <p className="text-sm text-gray-500 mt-2">Ce répétiteur n'est pas disponible actuellement.</p>
               </div>
             )}
-            {tutor.isActive && (!tutor.offers || tutor.offers.length === 0) && (
+            {recruitable && (!tutor.offers || tutor.offers.length === 0) && (
               <div className="card text-center py-6">
                 <p className="text-sm text-gray-400">Ce répétiteur n'a pas encore défini de tarif.</p>
               </div>

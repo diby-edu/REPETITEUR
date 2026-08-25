@@ -342,9 +342,10 @@ export function AppProvider({ children }) {
   }, [showToast])
 
   const getTutor = (id) => tutors.find(t => t.id === id)
+  // Visibilité gratuite : vérifié + non suspendu suffit à être listé.
+  // (L'abonnement payant conditionne l'acceptation d'un contrat, pas l'affichage.)
   const getActiveTutors = () => tutors.filter(t =>
-    t.isActive && t.verificationStatus === 'verified' && !t.suspended
-    && t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
+    t.verificationStatus === 'verified' && !t.suspended)
   const getPendingTutors = () => tutors.filter(t => t.verificationStatus === 'pending')
 
   const validateTutor = useCallback(async (tutorId, decision, reason = '') => {

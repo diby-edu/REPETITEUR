@@ -28,9 +28,10 @@ export default function SearchPage() {
   const setFilter = (key, val) => setFilters(p => ({ ...p, [key]: val }))
 
   const filtered = useMemo(() => {
+    // Visibilité gratuite : tout répétiteur vérifié et non suspendu est listé.
+    // L'abonnement payant conditionne l'acceptation d'un contrat, pas l'affichage.
     let result = tutors.filter(t =>
-      t.isActive && t.verificationStatus === 'verified' && !t.suspended
-      && t.subscription?.status === 'active' && t.subscription?.plan !== 'gratuit')
+      t.verificationStatus === 'verified' && !t.suspended)
 
     // matières couvertes par les offres du répétiteur (par classe)
     const offerSubjects = t => (t.offers || []).flatMap(o => o.subjects || [])

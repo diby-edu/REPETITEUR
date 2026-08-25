@@ -89,6 +89,7 @@ export default function TutorDashboardPage() {
 
   // Payment confirmation modal
   const [confirmingPay, setConfirmingPay]   = useState(null)
+  const [subGateId, setSubGateId]           = useState(null)   // demande à accepter en attente d'abonnement
   const [tutorContinue, setTutorContinue]   = useState(true)
   const [payConfirm, setPayConfirm]         = useState(false)
   const [payLoading, setPayLoading]         = useState(false)
@@ -211,6 +212,9 @@ export default function TutorDashboardPage() {
   }
 
   const handleRespondEngagement = async (engagementId, accept) => {
+    // Payer-pour-accepter : accepter une demande exige un abonnement payant actif.
+    const hasPaidSub = tutor.subscription?.status === 'active' && tutor.subscription?.plan !== 'gratuit'
+    if (accept && !hasPaidSub) { setSubGateId(engagementId); return }
     setRespondingId(engagementId)
     await respondToEngagement(engagementId, accept)
     setRespondingId(null)
@@ -983,6 +987,40 @@ export default function TutorDashboardPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Payer-pour-accepter : abonnement requis pour accepter ── */}
+      {subGateId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+             onClick={e => { if (e.target === e.currentTarget) setSubGateId(null) }}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                <GraduationCap size={20} className="text-primary" />
+              </div>
+              <h3 className="font-display font-bold text-lg text-gray-900">Une famille souhaite vous recruter 🎓</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">
+              Pour <strong>accepter cette famille</strong> et <strong>échanger avec elle</strong> via la messagerie intégrée, activez votre abonnement.
+            </p>
+            <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-4">
+              <p className="text-sm text-green-800 font-semibold">✅ Ce n'est pas un paiement par demande.</p>
+              <p className="text-xs text-green-700 mt-0.5">Une fois abonné, vous acceptez autant de familles que vous voulez, tant que votre abonnement est actif.</p>
+            </div>
+            <div className="space-y-2 mb-5 text-sm">
+              <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                <span className="font-medium text-gray-700">Standard</span><span className="font-bold text-gray-900">3 000 FCFA/mois</span>
+              </div>
+              <div className="flex items-center justify-between bg-accent-50 rounded-lg px-3 py-2">
+                <span className="font-medium text-gray-700">Premium <span className="text-[10px] text-accent-600">· profil mis en avant</span></span><span className="font-bold text-gray-900">5 000 FCFA/mois</span>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setSubGateId(null)} className="btn-outline flex-1">Plus tard</button>
+              <button onClick={() => { setSubGateId(null); router.push('/abonnement') }} className="btn-primary flex-1">Activer mon abonnement</button>
+            </div>
           </div>
         </div>
       )}

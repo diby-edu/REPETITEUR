@@ -5,7 +5,7 @@ export const SUBJECTS = [
   'Allemand', 'Musique', 'Chinois', 'Marketing'
 ]
 
-export const LEVELS = ['Primaire', 'Collège', 'Lycée', 'Supérieur']
+export const LEVELS = ['Primaire', 'Collège', 'Lycée']
 
 export const CITIES = [
   'Abidjan', 'Yamoussoukro', 'Bouaké', 'Daloa', 'Korhogo',

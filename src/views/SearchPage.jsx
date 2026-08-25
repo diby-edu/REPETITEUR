@@ -285,7 +285,7 @@ export default function SearchPage() {
                 : 'flex flex-col gap-4'
               }>
                 {filtered.map(tutor => (
-                  <TutorCard key={tutor.id} tutor={tutor} />
+                  <TutorCard key={tutor.id} tutor={tutor} list={viewMode === 'list'} />
                 ))}
               </div>
             )}

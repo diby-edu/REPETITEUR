@@ -5,6 +5,8 @@
 -- Résultat attendu : la ligne "TOUS LES TESTS PARRAINAGE PASSENT".
 -- ============================================================
 begin;
+-- FK profiles.id -> auth.users : retirée le temps du test (rétablie au rollback)
+alter table public.profiles drop constraint if exists profiles_id_fkey;
 do $$
 declare
   R uuid := gen_random_uuid(); -- parrain

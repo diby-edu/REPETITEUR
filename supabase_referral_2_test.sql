@@ -30,11 +30,11 @@ begin
     (Y,'tutor','Yann','Cap','y@t'),(G,'tutor','Gonzo','Fond','g@t'),
     (P,'parent','Pat','Rent','p@t');
   insert into public.tutors(id) values (R),(F1),(F2),(F3),(Y),(G);
-  update public.tutors set referred_by=R where id in (F1,F2,F3);
 
   -- ===== A. Place fondateur à la vérification (cap = 2) =====
-  -- (drapeau système = on simule l'admin qui vérifie ; le trigger on_tutor_verified attribue les places)
+  -- (drapeau système = on simule l'admin ; referred_by et la vérif sont des champs protégés)
   perform set_config('app.system_task','1',true);
+  update public.tutors set referred_by=R where id in (F1,F2,F3);
   update public.tutors set verification_status='verified' where id=R;  -- fondateur 1
   update public.tutors set verification_status='verified' where id=G;  -- fondateur 2
   update public.tutors set verification_status='verified' where id in (F1,F2,F3,Y); -- cap atteint

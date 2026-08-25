@@ -274,13 +274,16 @@ export function AppProvider({ children }) {
     // L'admin lit les lignes complètes (documents KYC + email requis pour la
     // vérification) ; tout le monde passe par la vue publique sans PII.
     if (currentUser?.role === 'admin') {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, tutors(*)')
-        .eq('role', 'tutor')
-        .not('tutors', 'is', null)
-      if (error) { console.error('loadTutors:', error); return }
-      setTutors(data.map(p => mapTutor(p, p.tutors)))
+      // Requêtes séparées : `tutors` a 2 FK vers `profiles` (id + referred_by)
+      // → l'embed profiles→tutors serait ambigu. On fusionne par id.
+      const [{ data: profs, error: e1 }, { data: tuts, error: e2 }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('role', 'tutor'),
+        supabase.from('tutors').select('*'),
+      ])
+      if (e1 || e2) { console.error('loadTutors:', e1 || e2); return }
+      const tutorById = {}
+      ;(tuts || []).forEach(t => { tutorById[t.id] = t })
+      setTutors((profs || []).filter(p => tutorById[p.id]).map(p => mapTutor(p, tutorById[p.id])))
     } else {
       const { data, error } = await supabase.from('public_tutors').select('*')
       if (error) { console.error('loadTutors:', error); return }

@@ -11,14 +11,19 @@ export function AuthProvider({ children }) {
   const fetchProfile = async (userId) => {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*, tutors(*)')
+      .select('*')
       .eq('id', userId)
       .single()
 
     if (!profile) return null
 
-    // Aplatir les données tutor si présentes
-    const tutor = profile.tutors
+    // Données tutor récupérées séparément : `tutors` a désormais 2 clés
+    // étrangères vers `profiles` (id + referred_by) → l'embed serait ambigu.
+    let tutor = null
+    if (profile.role === 'tutor') {
+      const { data } = await supabase.from('tutors').select('*').eq('id', userId).single()
+      tutor = data
+    }
     return {
       id: profile.id,
       role: profile.role,

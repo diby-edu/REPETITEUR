@@ -7,8 +7,8 @@ import { useApp } from '../context/AppContext'
 import { useAuth } from '../context/AuthContext'
 import StarRating from '../components/common/StarRating'
 import { VerifiedBadge, PremiumBadge, InactiveBadge } from '../components/common/Badge'
-import { Star, MapPin, Clock, CheckCircle, Heart, ChevronLeft, Send, Home, Building2, Users, Wifi, GraduationCap, ChevronDown } from 'lucide-react'
-import { formatFCFA, formatDate, MODALITIES } from '../utils/helpers'
+import { Star, MapPin, Clock, CheckCircle, Heart, ChevronLeft, Send, Home, Building2, Users, Wifi, GraduationCap, ChevronDown, Plus, X } from 'lucide-react'
+import { formatFCFA, formatDate, MODALITIES, filterPhoneAndEmail } from '../utils/helpers'
 
 // Regroupement des offres par cycle pour l'accordéon (replié par défaut).
 const CYCLE_ORDER = ['primaire', 'college', 'lycee']
@@ -20,8 +20,10 @@ export default function TutorProfilePage() {
   const { currentUser, isAuthenticated } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('profil')
-  const [subForm, setSubForm] = useState({ levelKey: '', schedule: '' })
-  const [subscribing, setSubscribing] = useState(false)
+  const [children, setChildren] = useState([{ label: '', levelKey: '' }])
+  const [recruitMsg, setRecruitMsg] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const [openCycles, setOpenCycles] = useState({})   // accordéon tarifs : replié par défaut
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
   const [respondingTo, setRespondingTo] = useState(null)
@@ -61,8 +63,6 @@ export default function TutorProfilePage() {
   const priceLabel = (tutor.priceMin && tutor.priceMax && tutor.priceMin !== tutor.priceMax)
     ? `${formatFCFA(tutor.priceMin)} – ${formatFCFA(tutor.priceMax)}`
     : formatFCFA(tutor.priceMin || tutor.monthlyRate || 0)
-  const selectedOffer = tutor.offers?.find(o => o.levelKey === subForm.levelKey)
-  const selectedPkg = levelPackages.find(p => p.levelKey === subForm.levelKey)
 
   // Offres regroupées par cycle
   const offersByCycle = {}
@@ -80,21 +80,40 @@ export default function TutorProfilePage() {
     else router.push('/connexion')
   }
 
-  const handleSubscribe = async (e) => {
+  // ── Formulaire « Je recrute » (multi-enfants) ──────────────────
+  const addChild = () => setChildren(c => [...c, { label: '', levelKey: '' }])
+  const removeChild = (i) => setChildren(c => c.length > 1 ? c.filter((_, idx) => idx !== i) : c)
+  const setChild = (i, patch) => setChildren(c => c.map((ch, idx) => idx === i ? { ...ch, ...patch } : ch))
+
+  const handleRecruit = async (e) => {
     e.preventDefault()
     if (!isAuthenticated) { router.push('/connexion'); return }
-    if (!selectedOffer) { showToast('Choisissez une classe.', 'error'); return }
-    setSubscribing(true)
-    const eng = await createEngagement({
-      parentId: currentUser.id,
-      tutorId: tutor.id,
-      levelKey: selectedOffer.levelKey,
-      subjects: selectedOffer.subjects,
-      monthlyRate: selectedOffer.monthlyPrice,
-      agreedSchedule: subForm.schedule,
-    })
-    setSubscribing(false)
-    if (eng) router.push('/reservations')
+    const valid = children.filter(c => c.levelKey)
+    if (valid.length === 0) { showToast('Indiquez au moins la classe d\'un enfant.', 'error'); return }
+    // Coordonnées interdites avant contrat : on bloque si le message en contient.
+    if (recruitMsg && filterPhoneAndEmail(recruitMsg) !== recruitMsg) {
+      showToast('Vous ne pouvez pas partager vos coordonnées avant le contrat.', 'error'); return
+    }
+    setSubmitting(true)
+    let ok = 0
+    for (const ch of valid) {
+      const offer = tutor.offers.find(o => o.levelKey === ch.levelKey)
+      if (!offer) continue
+      const eng = await createEngagement({
+        parentId: currentUser.id,
+        tutorId: tutor.id,
+        levelKey: offer.levelKey,
+        subjects: offer.subjects,
+        monthlyRate: offer.monthlyPrice,
+        childLabel: ch.label?.trim() || null,
+        notes: recruitMsg?.trim() || null,
+        silent: true,
+      })
+      if (eng) ok++
+    }
+    setSubmitting(false)
+    if (ok > 0) { setSubmitted(true); showToast(`Demande envoyée pour ${ok} enfant${ok > 1 ? 's' : ''} !`) }
+    else showToast('Erreur lors de l\'envoi de la demande.', 'error')
   }
 
   const handleReview = (e) => {
@@ -492,46 +511,69 @@ export default function TutorProfilePage() {
                   <p className="text-2xl font-bold text-primary">{priceLabel}</p>
                   <p className="text-sm text-gray-400">FCFA / mois</p>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <GraduationCap size={16} className="text-primary" /> Je recrute ce répétiteur
-                </h3>
-                <form onSubmit={handleSubscribe} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Classe de l'enfant</label>
-                    <select className="input-field text-sm py-2" value={subForm.levelKey}
-                            onChange={e => setSubForm(p => ({ ...p, levelKey: e.target.value }))} required>
-                      <option value="">Choisir une classe</option>
-                      {tutor.offers.map(o => {
-                        const pkg = levelPackages.find(p => p.levelKey === o.levelKey)
-                        return <option key={o.levelKey} value={o.levelKey}>{(pkg?.label || o.levelKey)} — {formatFCFA(o.monthlyPrice)}/mois</option>
-                      })}
-                    </select>
-                  </div>
 
-                  {selectedOffer && (
-                    <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-                      {selectedPkg && <p>Forfait : <strong>{selectedPkg.sessionsPerWeek} séance{selectedPkg.sessionsPerWeek > 1 ? 's' : ''}/sem · {selectedPkg.hoursPerMonth}h/mois</strong></p>}
-                      {selectedOffer.subjects?.length > 0 && <p>Matières : {selectedOffer.subjects.join(', ')}</p>}
-                      <p>Tarif : <strong className="text-primary">{formatFCFA(selectedOffer.monthlyPrice)}/mois</strong></p>
+                {submitted ? (
+                  <div className="text-center py-3">
+                    <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <CheckCircle size={28} className="text-green-500" />
                     </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Jours souhaités (à convenir)</label>
-                    <textarea className="input-field text-sm py-2 h-20 resize-none"
-                              placeholder={selectedPkg ? `Proposez ${selectedPkg.sessionsPerWeek} créneau${selectedPkg.sessionsPerWeek > 1 ? 'x' : ''}/sem — ex. Lundi 17h-19h${selectedPkg.sessionsPerWeek > 1 ? ' · Mercredi 17h-19h' : ''}` : "Choisissez d'abord une classe"}
-                              value={subForm.schedule} onChange={e => setSubForm(p => ({ ...p, schedule: e.target.value }))} />
+                    <p className="font-semibold text-gray-900 text-sm">Demande envoyée !</p>
+                    <p className="text-xs text-gray-500 mt-1">Le répétiteur va la recevoir. La messagerie s'ouvrira dès qu'il accepte.</p>
+                    <Link href="/reservations" className="btn-outline text-xs mt-4 inline-block">Voir mes demandes</Link>
                   </div>
+                ) : (
+                <>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <GraduationCap size={16} className="text-primary" /> Je recrute ce répétiteur
+                  </h3>
+                  <form onSubmit={handleRecruit} className="space-y-3">
+                    {children.map((ch, i) => {
+                      const offer = tutor.offers.find(o => o.levelKey === ch.levelKey)
+                      return (
+                        <div key={i} className="border border-gray-100 rounded-xl p-2.5 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-gray-500">Enfant {i + 1}</span>
+                            {children.length > 1 && (
+                              <button type="button" onClick={() => removeChild(i)} className="text-gray-300 hover:text-red-500"><X size={14} /></button>
+                            )}
+                          </div>
+                          <input className="input-field text-sm py-2" placeholder="Prénom / surnom de l'enfant"
+                                 value={ch.label} onChange={e => setChild(i, { label: e.target.value })} />
+                          <select className="input-field text-sm py-2" value={ch.levelKey}
+                                  onChange={e => setChild(i, { levelKey: e.target.value })} required>
+                            <option value="">Choisir la classe</option>
+                            {tutor.offers.map(o => {
+                              const pkg = levelPackages.find(p => p.levelKey === o.levelKey)
+                              return <option key={o.levelKey} value={o.levelKey}>{(pkg?.label || o.levelKey)} — {formatFCFA(o.monthlyPrice)}/mois</option>
+                            })}
+                          </select>
+                          {offer && <p className="text-[11px] text-primary font-semibold">{formatFCFA(offer.monthlyPrice)}/mois</p>}
+                        </div>
+                      )
+                    })}
 
-                  {isAuthenticated ? (
-                    <button type="submit" disabled={subscribing} className="btn-primary w-full text-sm disabled:opacity-60">
-                      {subscribing ? 'Envoi…' : '🎯 Envoyer ma demande'}
+                    <button type="button" onClick={addChild} className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline">
+                      <Plus size={14} /> Ajouter un enfant
                     </button>
-                  ) : (
-                    <Link href="/connexion" className="btn-primary w-full text-sm text-center block">Se connecter pour recruter</Link>
-                  )}
-                  <p className="text-[11px] text-gray-400 text-center">Le répétiteur doit accepter votre demande. Vous réglez à la fin de chaque mois, une fois les séances assurées.</p>
-                </form>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Message au répétiteur</label>
+                      <textarea className="input-field text-sm py-2 h-24 resize-none"
+                                placeholder="Présentez-vous et vos attentes. ⚠️ Ne partagez pas vos coordonnées (téléphone, email) — interdit avant le contrat."
+                                value={recruitMsg} onChange={e => setRecruitMsg(e.target.value)} />
+                    </div>
+
+                    {isAuthenticated ? (
+                      <button type="submit" disabled={submitting} className="btn-primary w-full text-sm disabled:opacity-60">
+                        {submitting ? 'Envoi…' : '🎯 Envoyer ma demande'}
+                      </button>
+                    ) : (
+                      <Link href="/connexion" className="btn-primary w-full text-sm text-center block">Se connecter pour recruter</Link>
+                    )}
+                    <p className="text-[11px] text-gray-400 text-center">Le répétiteur doit accepter votre demande. La messagerie s'ouvre après acceptation. Vous réglez à la fin de chaque mois.</p>
+                  </form>
+                </>
+                )}
               </div>
             )}
             {!recruitable && (

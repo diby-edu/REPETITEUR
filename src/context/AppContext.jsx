@@ -192,6 +192,7 @@ function mapEngagement(row) {
     subject: row.subject,
     levelKey: row.level_key,
     subjects: row.subjects || [],
+    childLabel: row.child_label,
     agreedSchedule: row.agreed_schedule,
     endedBy: row.ended_by,
     endedAt: row.ended_at,
@@ -871,6 +872,7 @@ export function AppProvider({ children }) {
         subject: data.subject || (data.subjects || []).join(', ') || null,
         level_key: data.levelKey || null,
         subjects: data.subjects || [],
+        child_label: data.childLabel || null,
         agreed_schedule: data.agreedSchedule || null,
         monthly_rate: data.monthlyRate,
         notes: data.notes || null,
@@ -881,10 +883,10 @@ export function AppProvider({ children }) {
       .select()
       .single()
 
-    if (error) { showToast('Erreur lors de la création du contrat.', 'error'); return null }
+    if (error) { if (!data.silent) showToast('Erreur lors de la création du contrat.', 'error'); return null }
     const engagement = mapEngagement(row)
     setEngagements(prev => [engagement, ...prev])
-    showToast('Contrat proposé au répétiteur !')
+    if (!data.silent) showToast('Demande envoyée au répétiteur !')
     return engagement
   }, [showToast])
 

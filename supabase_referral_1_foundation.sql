@@ -43,6 +43,7 @@ alter table public.tutors
   add column if not exists referral_qualified       boolean not null default false, -- a payé son 1er vrai mois
   add column if not exists referral_rewards_granted int     not null default 0,      -- récompenses déjà appliquées
   add column if not exists reward_days_banked       int     not null default 0,      -- mois gagnés en réserve (parrain encore gratuit)
+  add column if not exists has_paid_subscription    boolean not null default false, -- a déjà payé un vrai mois (débloque l'encaissement des récompenses)
   add column if not exists referee_discount_used    boolean not null default false;
 
 -- 3) Code de parrainage : 8 caractères déterministes (id) -------------

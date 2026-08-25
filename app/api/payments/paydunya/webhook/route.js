@@ -48,32 +48,12 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Données manquantes' }, { status: 400 })
     }
 
-    // Vérifier si le répétiteur est vérifié (pour mettre is_active à true)
-    const { data: tutor } = await supabaseAdmin
-      .from('tutors')
-      .select('verification_status')
-      .eq('id', tutorId)
-      .single()
-
-    const isVerified = tutor?.verification_status === 'verified'
-
-    // Calculer les dates (1 mois)
-    const startDate = new Date().toISOString().split('T')[0]
-    const endDate = new Date()
-    endDate.setMonth(endDate.getMonth() + 1)
-    const endDateStr = endDate.toISOString().split('T')[0]
-
-    // Activer l'abonnement dans Supabase
-    const { error } = await supabaseAdmin
-      .from('tutors')
-      .update({
-        subscription_plan: plan,
-        subscription_start: startDate,
-        subscription_end: endDateStr,
-        subscription_status: 'active',
-        is_active: isVerified,
-      })
-      .eq('id', tutorId)
+    // Activer l'abonnement PAYANT via la RPC : gère is_active + dates, et
+    // déclenche le parrainage (qualifie le filleul, applique les mois offerts
+    // en réserve, marque le 1er paiement).
+    const { error } = await supabaseAdmin.rpc('activate_paid_subscription', {
+      p_tutor: tutorId, p_plan: plan, p_months: 1,
+    })
 
     if (error) {
       console.error('[PayDunya webhook] Supabase error:', error)

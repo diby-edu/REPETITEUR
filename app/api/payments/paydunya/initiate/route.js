@@ -50,18 +50,37 @@ export async function POST(request) {
     const tutorId = user.id
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
+    // Remise filleul (−X % sur le 1er mois payant) si éligible — calculée
+    // côté serveur via une RPC, jamais reçue du client.
+    const supabaseUser = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    )
+    let discountPct = 0
+    try {
+      const { data } = await supabaseUser.rpc('referee_discount_for_me')
+      discountPct = Number(data) || 0
+    } catch { /* remise ignorée si indisponible */ }
+    const price = discountPct > 0
+      ? Math.max(1, Math.round(plan.price * (100 - discountPct) / 100))
+      : plan.price
+    const label = discountPct > 0
+      ? `Abonnement ${plan.name} — MonRépétiteur (−${discountPct}% parrainage)`
+      : `Abonnement ${plan.name} — MonRépétiteur`
+
     const payload = {
       invoice: {
         items: {
           item_0: {
-            name: `Abonnement ${plan.name} — MonRépétiteur`,
+            name: label,
             quantity: 1,
-            unit_price: String(plan.price),
-            total_price: String(plan.price),
+            unit_price: String(price),
+            total_price: String(price),
             description: `Abonnement mensuel ${plan.name}`,
           },
         },
-        total_amount: plan.price,
+        total_amount: price,
         description: `Abonnement ${plan.name} MonRépétiteur`,
       },
       store: {

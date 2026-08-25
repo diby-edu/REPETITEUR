@@ -414,13 +414,11 @@ export function AppProvider({ children }) {
     const tutor = tutors.find(t => t.id === tutorId)
     const isActive = tutor?.verificationStatus === 'verified' && plan !== 'gratuit'
 
-    const { error } = await supabase.from('tutors').update({
-      subscription_plan: plan,
-      subscription_start: startDate,
-      subscription_end: endDateStr,
-      subscription_status: 'active',
-      is_active: isActive,
-    }).eq('id', tutorId)
+    // Activation via la RPC : gère dates + is_active ET déclenche le parrainage
+    // (qualifie le filleul, applique les mois offerts en réserve).
+    const { error } = await supabase.rpc('activate_paid_subscription', {
+      p_tutor: tutorId, p_plan: plan, p_months: Number(months || 1),
+    })
 
     if (error) { showToast('Erreur abonnement.', 'error'); return false }
     setTutors(prev => prev.map(t => t.id !== tutorId ? t : {

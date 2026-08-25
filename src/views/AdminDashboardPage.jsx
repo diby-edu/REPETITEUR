@@ -9,12 +9,12 @@ import StarRating from '../components/common/StarRating'
 import {
   Users, GraduationCap, Calendar, TrendingUp, ShieldCheck,
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
-  BarChart3, FileText, ExternalLink, Wallet, Star, MessageSquare,
+  BarChart3, FileText, ExternalLink, Wallet, Star, MessageSquare, Gift,
 } from 'lucide-react'
 import { formatDateShort, formatFCFA, getDocumentApprovalProgress } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
-const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Contrats', 'Paiements', 'Avis', 'Conversations']
+const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Parrainage', 'Contrats', 'Paiements', 'Avis', 'Conversations']
 const TODAY = new Date().toISOString().split('T')[0]
 
 // Week / month boundaries (computed once at module load)
@@ -245,6 +245,9 @@ export default function AdminDashboardPage() {
   const [convProfiles, setConvProfiles] = useState({})          // id → {first_name,last_name,role}
   const [adminConvId, setAdminConvId]   = useState(null)        // conversation ouverte
   const [adminMessages, setAdminMessages] = useState([])
+  const [refCfg, setRefCfg]         = useState(null)   // config parrainage éditable
+  const [refOverview, setRefOverview] = useState(null) // vue d'ensemble parrainage
+  const [refSaving, setRefSaving]   = useState(false)
   const [recentEngagements, setRecentEngagements] = useState([])
   const [paymentsList, setPaymentsList] = useState([])
   const [reviewsList, setReviewsList]   = useState([])
@@ -452,6 +455,30 @@ export default function AdminDashboardPage() {
   const convName = (id) => {
     const p = convProfiles[id]
     return p ? `${p.first_name} ${p.last_name}` : '—'
+  }
+
+  // ── Load Parrainage tab ──────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== 'Parrainage') return
+    supabase.from('referral_config').select('*').eq('id', 1).single().then(({ data }) => setRefCfg(data))
+    supabase.rpc('admin_referral_overview').then(({ data }) => setRefOverview(data))
+  }, [activeTab])
+
+  const saveRefConfig = async () => {
+    if (!refCfg) return
+    setRefSaving(true)
+    const { error } = await supabase.from('referral_config').update({
+      welcome_enabled: refCfg.welcome_enabled,
+      welcome_max_tutors: Number(refCfg.welcome_max_tutors) || 0,
+      welcome_grace_days: Number(refCfg.welcome_grace_days) || 0,
+      referral_enabled: refCfg.referral_enabled,
+      referral_threshold: Number(refCfg.referral_threshold) || 1,
+      referral_reward_days: Number(refCfg.referral_reward_days) || 0,
+      referee_discount_pct: Number(refCfg.referee_discount_pct) || 0,
+      updated_at: new Date().toISOString(),
+    }).eq('id', 1)
+    setRefSaving(false)
+    showToast(error ? 'Erreur lors de l\'enregistrement.' : 'Réglages enregistrés.', error ? 'error' : 'success')
   }
 
   // ── CSV Export ───────────────────────────────────────────────
@@ -1501,6 +1528,117 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'Parrainage' && (
+          <div className="space-y-5">
+            {/* Réglages */}
+            <div className="card">
+              <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                <Gift size={18} className="text-primary" /> Réglages du parrainage
+              </h3>
+              <p className="text-xs text-gray-400 mb-4">Modifiez puis enregistrez — appliqué immédiatement, sans redéploiement.</p>
+              {!refCfg ? <p className="text-sm text-gray-400">Chargement…</p> : (
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded" checked={!!refCfg.welcome_enabled}
+                      onChange={e => setRefCfg({ ...refCfg, welcome_enabled: e.target.checked })} />
+                    <span className="text-sm font-medium text-gray-800">Offre fondateur active <span className="text-gray-400 font-normal">(gratuit jusqu'au 1er contrat)</span></span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Places fondateur (0 = illimité)</label>
+                      <input type="number" className="input-field text-sm" value={refCfg.welcome_max_tutors}
+                        onChange={e => setRefCfg({ ...refCfg, welcome_max_tutors: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Jours pour payer (après 1er contrat)</label>
+                      <input type="number" className="input-field text-sm" value={refCfg.welcome_grace_days}
+                        onChange={e => setRefCfg({ ...refCfg, welcome_grace_days: e.target.value })} />
+                    </div>
+                  </div>
+                  <hr className="border-gray-100" />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 rounded" checked={!!refCfg.referral_enabled}
+                      onChange={e => setRefCfg({ ...refCfg, referral_enabled: e.target.checked })} />
+                    <span className="text-sm font-medium text-gray-800">Parrainage actif</span>
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Filleuls payants pour 1 mois offert</label>
+                      <input type="number" className="input-field text-sm" value={refCfg.referral_threshold}
+                        onChange={e => setRefCfg({ ...refCfg, referral_threshold: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Jours offerts au parrain</label>
+                      <input type="number" className="input-field text-sm" value={refCfg.referral_reward_days}
+                        onChange={e => setRefCfg({ ...refCfg, referral_reward_days: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Remise filleul (%)</label>
+                      <input type="number" className="input-field text-sm" value={refCfg.referee_discount_pct}
+                        onChange={e => setRefCfg({ ...refCfg, referee_discount_pct: e.target.value })} />
+                    </div>
+                  </div>
+                  <button onClick={saveRefConfig} disabled={refSaving} className="btn-primary text-sm disabled:opacity-50">
+                    {refSaving ? 'Enregistrement…' : 'Enregistrer les réglages'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Vue d'ensemble */}
+            <div className="card">
+              <h3 className="font-semibold text-gray-900 mb-4">Vue d'ensemble</h3>
+              {!refOverview ? <p className="text-sm text-gray-400">Chargement…</p> : (
+                <>
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    <div className="bg-accent-50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-gray-900 tabular-nums">{refOverview.founders_used}<span className="text-base text-gray-400">/{refOverview.founders_max > 0 ? refOverview.founders_max : '∞'}</span></p>
+                      <p className="text-xs text-gray-500 mt-0.5">Fondateurs</p>
+                    </div>
+                    <div className="bg-primary-50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-gray-900 tabular-nums">{refOverview.total_referred}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Filleuls (total)</p>
+                    </div>
+                    <div className="bg-secondary-50 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-gray-900 tabular-nums">{refOverview.total_qualified}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Filleuls qualifiés</p>
+                    </div>
+                  </div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">Parrains ({refOverview.referrers?.length || 0})</p>
+                  {(!refOverview.referrers || refOverview.referrers.length === 0) ? (
+                    <p className="text-sm text-gray-400 text-center py-6">Aucun parrain pour l'instant.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {refOverview.referrers.map(rr => (
+                        <div key={rr.id} className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{rr.name} <span className="text-xs text-gray-400 font-mono">{rr.code}</span></p>
+                            <p className="text-xs text-gray-500">
+                              {rr.total} filleul{rr.total > 1 ? 's' : ''} · <strong className="text-secondary">{rr.qualified} qualifié{rr.qualified > 1 ? 's' : ''}</strong> · {rr.pending} en attente
+                              {rr.rewards_granted > 0 && <> · {rr.rewards_granted} mois gagné{rr.rewards_granted > 1 ? 's' : ''}</>}
+                              {rr.banked_days > 0 && <> · {Math.round(rr.banked_days / 30)} en réserve</>}
+                            </p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              await supabase.rpc('admin_grant_reward_days', { p_tutor: rr.id, p_days: 30 })
+                              showToast('1 mois crédité.')
+                              supabase.rpc('admin_referral_overview').then(({ data }) => setRefOverview(data))
+                            }}
+                            className="text-xs font-semibold text-primary bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg whitespace-nowrap"
+                          >
+                            +1 mois
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -6,7 +6,7 @@ import { useApp } from '../../context/AppContext'
 import Avatar from '../common/Avatar'
 import {
   LayoutDashboard, Calendar, BookOpen, LogOut, Users, ShieldCheck,
-  CreditCard, FileText, Wallet, Star, Bell, Heart, Settings, X, MessageSquare,
+  CreditCard, FileText, Wallet, Star, Bell, Heart, Settings, X, MessageSquare, Gift,
 } from 'lucide-react'
 
 const NAV = {
@@ -30,6 +30,7 @@ const NAV = {
     { label: 'Utilisateurs',  href: '/admin?tab=Utilisateurs',      icon: Users },
     { label: 'Abonnements',   href: '/admin?tab=Abonnements',       icon: CreditCard },
     { label: 'Forfaits',      href: '/admin?tab=Forfaits',          icon: BookOpen },
+    { label: 'Parrainage',    href: '/admin?tab=Parrainage',        icon: Gift },
     { label: 'Contrats',      href: '/admin?tab=Contrats',          icon: FileText },
     { label: 'Paiements',     href: '/admin?tab=Paiements',         icon: Wallet },
     { label: 'Avis',          href: '/admin?tab=Avis',              icon: Star },

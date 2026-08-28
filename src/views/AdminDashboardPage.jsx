@@ -212,7 +212,8 @@ function SparklineChart({ data, height = 80 }) {
 }
 
 export default function AdminDashboardPage() {
-  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors, levelPackages, updateLevelPackage, getResponseStats } = useApp()
+  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors, levelPackages, updateLevelPackage, getResponseStats,
+    loadPlatformConfig, setModerationGate, loadModerationQueue, releaseEngagement } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -247,6 +248,10 @@ export default function AdminDashboardPage() {
   const [adminMessages, setAdminMessages] = useState([])
   const [modMsg, setModMsg]               = useState('')
   const [modSending, setModSending]       = useState(false)
+  const [modGate, setModGate]             = useState(false)   // péage on/off
+  const [modQueue, setModQueue]           = useState([])      // demandes retenues
+  const [modNotes, setModNotes]           = useState({})      // engagementId → message édité
+  const [modBusy, setModBusy]             = useState(null)
   const [refCfg, setRefCfg]         = useState(null)   // config parrainage éditable
   const [refOverview, setRefOverview] = useState(null) // vue d'ensemble parrainage
   const [refSaving, setRefSaving]   = useState(false)
@@ -439,6 +444,11 @@ export default function AdminDashboardPage() {
         .from('conversations').select('*')
         .order('last_message_at', { ascending: false, nullsFirst: false })
       setAdminConvs(convs || [])
+      loadPlatformConfig().then(c => setModGate(!!c?.moderation_gate_enabled))
+      loadModerationQueue().then(q => {
+        setModQueue(q)
+        setModNotes(Object.fromEntries(q.map(e => [e.id, e.notes || ''])))
+      })
       const ids = [...new Set((convs || []).flatMap(c => [c.participant_1, c.participant_2]).filter(Boolean))]
       if (ids.length) {
         const { data: profs } = await supabase.from('profiles').select('id, first_name, last_name, role').in('id', ids)
@@ -478,6 +488,18 @@ export default function AdminDashboardPage() {
     setAdminMessages(data || [])
     setModSending(false)
     showToast('Message de modération envoyé.')
+  }
+
+  const toggleModGate = async () => {
+    const next = !modGate
+    const ok = await setModerationGate(next)
+    if (ok) { setModGate(next); showToast(next ? 'Péage activé — les demandes passent par vous.' : 'Péage désactivé.') }
+  }
+  const handleRelease = async (id) => {
+    setModBusy(id)
+    const ok = await releaseEngagement(id, modNotes[id])
+    setModBusy(null)
+    if (ok) setModQueue(q => q.filter(e => e.id !== id))
   }
 
   // ── Load Parrainage tab ──────────────────────────────────────
@@ -1513,6 +1535,44 @@ export default function AdminDashboardPage() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Conversations ({adminConvs.length})</h3>
               <span className="text-xs text-gray-400">Modération — vos messages apparaissent en rouge chez les 2 parties</span>
+            </div>
+
+            {/* Péage de modération */}
+            <div className="card mb-5 border-orange-200 bg-orange-50/30">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">🚦 Péage de modération</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Quand activé, les nouvelles demandes de recrutement passent par vous : le répétiteur n'est notifié qu'après votre validation.</p>
+                </div>
+                <button onClick={toggleModGate}
+                        className={`w-12 h-7 rounded-full flex-shrink-0 relative transition-colors ${modGate ? 'bg-primary' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${modGate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              {modQueue.length > 0 && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs font-bold text-orange-700">{modQueue.length} demande{modQueue.length > 1 ? 's' : ''} à valider</p>
+                  {modQueue.map(e => (
+                    <div key={e.id} className="bg-white border border-orange-200 rounded-xl p-3">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Demande · {levelPackages.find(p => p.levelKey === e.levelKey)?.label || e.levelKey}
+                        {e.childLabel ? ` · ${e.childLabel}` : ''}
+                        <span className="text-gray-400 font-normal"> · {formatFCFA(e.monthlyRate)}/mois</span>
+                      </p>
+                      <label className="text-[11px] text-gray-500 mt-2 block">Message au répétiteur (éditable avant transmission)</label>
+                      <textarea className="input-field text-sm mt-1 h-20 resize-none"
+                                value={modNotes[e.id] ?? ''}
+                                onChange={ev => setModNotes(m => ({ ...m, [e.id]: ev.target.value }))} />
+                      <div className="flex justify-end mt-2">
+                        <button onClick={() => handleRelease(e.id)} disabled={modBusy === e.id}
+                                className="text-sm font-semibold text-white bg-secondary hover:bg-secondary-600 rounded-xl px-4 py-2 disabled:opacity-50">
+                          {modBusy === e.id ? '…' : 'Valider et transmettre'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             {adminConvs.length === 0 ? (
               <div className="card text-center py-12">

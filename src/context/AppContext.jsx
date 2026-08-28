@@ -194,6 +194,7 @@ function mapEngagement(row) {
     levelKey: row.level_key,
     subjects: row.subjects || [],
     childLabel: row.child_label,
+    moderationStatus: row.moderation_status,
     agreedSchedule: row.agreed_schedule,
     endedBy: row.ended_by,
     endedAt: row.ended_at,
@@ -873,7 +874,9 @@ export function AppProvider({ children }) {
       .order('created_at', { ascending: false })
 
     if (error) { console.error('loadEngagements:', error); return }
-    setEngagements(data.map(mapEngagement))
+    // Péage : le répétiteur ne voit pas les demandes retenues en modération.
+    const rows = role === 'tutor' ? data.filter(e => e.moderation_status !== 'pending_review') : data
+    setEngagements(rows.map(mapEngagement))
   }, [])
 
   const getUserEngagements = (userId, role) => {
@@ -974,6 +977,32 @@ export function AppProvider({ children }) {
     if (error) { console.error('loadTutorInterests:', error); return [] }
     return data.map(r => r.parent_id)
   }, [])
+
+  // ── Péage de modération (Lot 4B) ────────────────────────────
+  const loadPlatformConfig = useCallback(async () => {
+    const { data } = await supabase.from('platform_config').select('*').eq('id', 1).single()
+    return data
+  }, [])
+
+  const setModerationGate = useCallback(async (enabled) => {
+    const { error } = await supabase.from('platform_config').update({ moderation_gate_enabled: enabled }).eq('id', 1)
+    if (error) { showToast('Erreur.', 'error'); return false }
+    return true
+  }, [showToast])
+
+  const loadModerationQueue = useCallback(async () => {
+    const { data, error } = await supabase.from('engagements').select('*')
+      .eq('moderation_status', 'pending_review').order('created_at', { ascending: false })
+    if (error) { console.error('loadModerationQueue:', error); return [] }
+    return data.map(mapEngagement)
+  }, [])
+
+  const releaseEngagement = useCallback(async (id, notes) => {
+    const { error } = await supabase.rpc('release_engagement', { p_id: id, p_notes: notes || null })
+    if (error) { showToast('Erreur lors de la validation.', 'error'); return false }
+    showToast('Demande validée et transmise au répétiteur.')
+    return true
+  }, [showToast])
 
   // Propose une modification de planning (parent ou répétiteur)
   const proposeScheduleChange = useCallback(async (engagementId, newSchedule, proposedBy) => {
@@ -1250,6 +1279,7 @@ export function AppProvider({ children }) {
       loadUserEngagements, getUserEngagements,
       createEngagement, respondToEngagement, endEngagement, setSessionsDone,
       expressInterest, loadTutorInterests,
+      loadPlatformConfig, setModerationGate, loadModerationQueue, releaseEngagement,
       proposeScheduleChange, respondToScheduleChange,
 
       // Séances

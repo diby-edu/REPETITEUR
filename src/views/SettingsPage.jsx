@@ -308,6 +308,7 @@ export default function SettingsPage() {
     reviewReceived: true,
     subscriptionExpiry: true,
     profileViews: false,
+    tutorInterest: true,
     ...(currentUser?.notificationPreferences || {}),
   }))
 
@@ -895,14 +896,21 @@ export default function SettingsPage() {
               <div className="card">
                 <h2 className="font-semibold text-gray-900 mb-4">Préférences de notifications</h2>
                 <div className="space-y-4">
-                  {[
-                    { key: 'newMessage', label: 'Nouveaux messages', desc: 'Soyez notifié quand vous recevez un message' },
-                    { key: 'bookingRequest', label: 'Demandes de séance', desc: 'Nouvelles demandes reçues' },
-                    { key: 'bookingUpdate', label: 'Mises à jour de réservation', desc: 'Confirmations, annulations, etc.' },
-                    { key: 'reviewReceived', label: 'Nouveaux avis', desc: 'Quand un parent laisse un avis sur votre profil' },
-                    { key: 'subscriptionExpiry', label: 'Expiration d\'abonnement', desc: 'Rappel 5 jours avant expiration' },
-                    { key: 'profileViews', label: 'Vues de profil', desc: 'Statistiques hebdomadaires de votre profil' },
-                  ].map(item => (
+                  {(currentUser?.role === 'parent'
+                    ? [
+                        { key: 'newMessage', label: 'Nouveaux messages', desc: 'Quand un répétiteur vous écrit' },
+                        { key: 'bookingUpdate', label: 'Mises à jour de vos demandes', desc: 'Acceptation, contrat, fin de contrat…' },
+                        { key: 'tutorInterest', label: 'Propositions de répétiteurs', desc: 'Quand un répétiteur est intéressé par votre profil' },
+                      ]
+                    : [
+                        { key: 'newMessage', label: 'Nouveaux messages', desc: 'Soyez notifié quand vous recevez un message' },
+                        { key: 'bookingRequest', label: 'Demandes de recrutement', desc: 'Nouvelles demandes de familles' },
+                        { key: 'bookingUpdate', label: 'Mises à jour de contrat', desc: 'Acceptations, fins de contrat, etc.' },
+                        { key: 'reviewReceived', label: 'Nouveaux avis', desc: 'Quand un parent laisse un avis sur votre profil' },
+                        { key: 'subscriptionExpiry', label: 'Expiration d\'abonnement', desc: 'Rappel avant expiration' },
+                        { key: 'profileViews', label: 'Vues de profil', desc: 'Statistiques hebdomadaires de votre profil' },
+                      ]
+                  ).map(item => (
                     <div key={item.key} className="flex items-start justify-between gap-4 py-2 border-b border-gray-50 last:border-0">
                       <div>
                         <p className="text-sm font-medium text-gray-800">{item.label}</p>

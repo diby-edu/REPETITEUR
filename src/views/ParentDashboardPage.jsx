@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAuth } from '../context/AuthContext'
 import { useApp } from '../context/AppContext'
@@ -9,7 +9,7 @@ import Avatar from '../components/common/Avatar'
 import TutorCard from '../components/common/TutorCard'
 import {
   Calendar, MessageCircle, Heart, Search, Clock,
-  FileText, AlertCircle, ChevronRight, BookOpen,
+  FileText, AlertCircle, ChevronRight, ChevronLeft, BookOpen,
   Users, Send, MapPin, Star,
 } from 'lucide-react'
 import { formatFCFA } from '../utils/helpers'
@@ -76,6 +76,8 @@ export default function ParentDashboardPage() {
 
   // ── Répétiteurs disponibles ─────────────────────────────────
   const [matchingTutors, setMatchingTutors] = useState([])
+  const availRef = useRef(null)
+  const scrollAvail = (dir) => availRef.current?.scrollBy({ left: dir * 240, behavior: 'smooth' })
   const [contactingId, setContactingId]     = useState(null)
 
   // ── Payment declaration modal ───────────────────────────────
@@ -335,13 +337,25 @@ export default function ParentDashboardPage() {
               </div>
               <Link href="/recherche" className="text-xs text-primary font-semibold hover:underline">Voir tout →</Link>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                ...matchingTutors.filter(t => favoriteIds.has(t.id)),
-                ...matchingTutors.filter(t => !favoriteIds.has(t.id)),
-              ].slice(0, 6).map(t => (
-                <TutorCard key={t.id} tutor={t} />
-              ))}
+            <div className="relative">
+              <button type="button" onClick={() => scrollAvail(-1)}
+                      className="hidden sm:flex absolute -left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white shadow-md border border-gray-100 items-center justify-center hover:bg-gray-50">
+                <ChevronLeft size={16} />
+              </button>
+              <div ref={availRef} className="flex gap-3 overflow-x-auto scroll-smooth snap-x pb-1" style={{ scrollbarWidth: 'none' }}>
+                {[
+                  ...matchingTutors.filter(t => favoriteIds.has(t.id)),
+                  ...matchingTutors.filter(t => !favoriteIds.has(t.id)),
+                ].slice(0, 12).map(t => (
+                  <div key={t.id} className="w-40 flex-shrink-0 snap-start">
+                    <TutorCard tutor={t} />
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={() => scrollAvail(1)}
+                      className="hidden sm:flex absolute -right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white shadow-md border border-gray-100 items-center justify-center hover:bg-gray-50">
+                <ChevronRight size={16} />
+              </button>
             </div>
           </div>
         )}

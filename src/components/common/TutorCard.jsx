@@ -102,7 +102,7 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col group">
       <Link href={href} className="flex-1 flex flex-col no-underline">
-        <div className="relative aspect-square">
+        <div className="relative aspect-[4/3]">
           <Photo className="absolute inset-0 w-full h-full" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent pointer-events-none" />
           <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">

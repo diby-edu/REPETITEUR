@@ -35,12 +35,8 @@ export default function HomePage() {
   const { currentUser, isAuthenticated } = useAuth()
   const [search, setSearch] = useState({ query: '', city: '' })
 
-  // Rediriger tuteurs et parents vers leur espace — l'admin peut rester sur la landing
-  useEffect(() => {
-    if (!isAuthenticated || !currentUser || currentUser.role === 'admin') return
-    if (currentUser.role === 'tutor') router.replace('/tableau-de-bord/repetiteur')
-    else if (currentUser.role === 'parent') router.replace('/tableau-de-bord/parent')
-  }, [isAuthenticated, currentUser, router])
+  // La landing reste accessible à tous (connectés inclus) — le logo y ramène
+  // toujours. Plus de redirection automatique vers le dashboard.
 
   const activeTutors = getActiveTutors()
   // Répétiteurs mis en avant : tous les actifs vérifiés, Premium en tête,

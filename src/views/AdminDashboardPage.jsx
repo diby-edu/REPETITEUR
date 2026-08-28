@@ -1250,8 +1250,10 @@ export default function AdminDashboardPage() {
                     <p className="text-sm font-semibold text-gray-700">
                       {tutor.subscription?.plan === 'premium' ? formatFCFA(5000) : tutor.subscription?.plan === 'standard' ? formatFCFA(3000) : '—'}
                     </p>
-                    {tutor.subscription?.endDate && (
-                      <p className="text-xs text-gray-400">exp. {formatDateShort(tutor.subscription.endDate)}</p>
+                    {(tutor.subscription?.endDate || tutor.subscription?.status === 'active') && (
+                      <p className="text-xs text-gray-400">
+                        exp. {tutor.subscription?.endDate ? formatDateShort(tutor.subscription.endDate) : '—'}
+                      </p>
                     )}
                   </div>
                   <button

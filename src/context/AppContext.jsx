@@ -937,6 +937,22 @@ export function AppProvider({ children }) {
     showToast(accept ? 'Demande acceptée ! Vous pouvez échanger via la messagerie.' : 'Demande refusée.')
   }, [showToast, getOrCreateConversation])
 
+  // ── Intérêt répétiteur → parent (additif D) ─────────────────
+  // Le répétiteur signale son intérêt : notifie le parent (sans dévoiler
+  // ses coordonnées), sans créer de conversation. 1 par couple.
+  const expressInterest = useCallback(async (parentId) => {
+    const { error } = await supabase.rpc('express_interest', { p_parent: parentId })
+    if (error) { showToast('Erreur lors de l\'envoi de votre intérêt.', 'error'); return false }
+    showToast('Intérêt envoyé au parent !')
+    return true
+  }, [showToast])
+
+  const loadTutorInterests = useCallback(async (tutorId) => {
+    const { data, error } = await supabase.from('tutor_interests').select('parent_id').eq('tutor_id', tutorId)
+    if (error) { console.error('loadTutorInterests:', error); return [] }
+    return data.map(r => r.parent_id)
+  }, [])
+
   // Propose une modification de planning (parent ou répétiteur)
   const proposeScheduleChange = useCallback(async (engagementId, newSchedule, proposedBy) => {
     const { error } = await supabase.from('engagements').update({
@@ -1210,6 +1226,7 @@ export function AppProvider({ children }) {
       // Engagements
       loadUserEngagements, getUserEngagements,
       createEngagement, respondToEngagement, endEngagement, setSessionsDone,
+      expressInterest, loadTutorInterests,
       proposeScheduleChange, respondToScheduleChange,
 
       // Séances

@@ -54,6 +54,7 @@ export default function TutorDashboardPage() {
     loadUserEngagements, getUserEngagements,
     loadAllUserSessions, getAllUserSessions,
     respondToEngagement, confirmPayment, endEngagement,
+    expressInterest, loadTutorInterests,
     runMaintenanceTasks, showToast, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
@@ -78,6 +79,8 @@ export default function TutorDashboardPage() {
   }, [searchParams, router])
 
   const [matchingParents, setMatchingParents]       = useState([])
+  const [interestedIds, setInterestedIds]           = useState(new Set())
+  const [interestBusy, setInterestBusy]             = useState(null)
   const [conversationPartners, setConversationPartners] = useState({})
   const [parentProfiles, setParentProfiles]         = useState({})
   const [pendingPayments, setPendingPayments]       = useState([])
@@ -199,17 +202,20 @@ export default function TutorDashboardPage() {
 
   // ── Handlers ────────────────────────────────────────────────
 
-  const handleContactParent = async (parentId) => {
-    if (contactingId) return
-    // Fonctionnalité réservée aux abonnements payants actifs.
-    if (!tutor.isActive) { showToast('Passez à un plan payant pour contacter les parents.', 'error'); return }
+  // Additif D : le répétiteur signale son intérêt (pas de contact à froid).
+  const handleExpressInterest = async (parentId) => {
+    if (interestBusy) return
     const par = matchingParents.find(p => p.id === parentId)
-    if (par && par.openToContact === false) { showToast('Ce parent ne souhaite pas être contacté par message.', 'error'); return }
-    setContactingId(parentId)
-    const conv = await getOrCreateConversation(tutor.id, parentId)
-    setContactingId(null)
-    if (conv) openChat(conv.id)
+    if (par && par.openToContact === false) { showToast('Ce parent ne souhaite pas être sollicité.', 'error'); return }
+    setInterestBusy(parentId)
+    const ok = await expressInterest(parentId)
+    setInterestBusy(null)
+    if (ok) setInterestedIds(s => new Set(s).add(parentId))
   }
+
+  useEffect(() => {
+    if (tutor?.id) loadTutorInterests(tutor.id).then(ids => setInterestedIds(new Set(ids)))
+  }, [tutor?.id, loadTutorInterests])
 
   const handleRespondEngagement = async (engagementId, accept) => {
     // Payer-pour-accepter : accepter une demande exige un abonnement payant actif.
@@ -587,22 +593,35 @@ export default function TutorDashboardPage() {
                       </div>
                     )}
                   </div>
-                  {par.openToContact === false ? (
-                    <div className="mt-auto text-center bg-gray-50 border border-gray-200 rounded-xl py-2 px-2">
-                      <p className="text-xs text-gray-500 font-medium">🔕 Ne souhaite pas être contacté</p>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleContactParent(par.id)}
-                      disabled={contactingId === par.id}
-                      className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
-                    >
-                      {contactingId === par.id
-                        ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : <Send size={13} />}
-                      Contacter
-                    </button>
-                  )}
+                  {(() => {
+                    if (par.openToContact === false) return (
+                      <div className="mt-auto text-center bg-gray-50 border border-gray-200 rounded-xl py-2 px-2">
+                        <p className="text-xs text-gray-500 font-medium">🔕 Ne souhaite pas être sollicité</p>
+                      </div>
+                    )
+                    if (activeEngagements.some(e => e.parentId === par.id)) return (
+                      <div className="mt-auto text-center bg-green-50 border border-green-200 rounded-xl py-2 px-2">
+                        <p className="text-xs text-green-700 font-semibold">✓ Contrat en cours</p>
+                      </div>
+                    )
+                    if (interestedIds.has(par.id)) return (
+                      <div className="mt-auto text-center bg-secondary-50 border border-secondary-100 rounded-xl py-2 px-2">
+                        <p className="text-xs text-secondary font-semibold">✓ Intérêt envoyé</p>
+                      </div>
+                    )
+                    return (
+                      <button
+                        onClick={() => handleExpressInterest(par.id)}
+                        disabled={interestBusy === par.id}
+                        className="mt-auto btn-primary text-xs py-2 flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        {interestBusy === par.id
+                          ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <Send size={13} />}
+                        Intéressé
+                      </button>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

@@ -309,6 +309,14 @@ export default function SettingsPage() {
     subscriptionExpiry: true,
     profileViews: false,
     tutorInterest: true,
+    // Email (défaut : ON pour actionnables/rares, OFF pour fréquents)
+    email_newMessage: false,
+    email_bookingRequest: true,
+    email_bookingUpdate: true,
+    email_reviewReceived: false,
+    email_subscriptionExpiry: false,
+    email_profileViews: false,
+    email_tutorInterest: true,
     ...(currentUser?.notificationPreferences || {}),
   }))
 
@@ -916,12 +924,19 @@ export default function SettingsPage() {
                         <p className="text-sm font-medium text-gray-800">{item.label}</p>
                         <p className="text-xs text-gray-400">{item.desc}</p>
                       </div>
-                      <button
-                        onClick={() => setNotifications(p => ({ ...p, [item.key]: !p[item.key] }))}
-                        className={`w-11 h-6 rounded-full flex-shrink-0 relative transition-colors duration-200 ${notifications[item.key] ? 'bg-primary' : 'bg-gray-200'}`}
-                      >
-                        <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifications[item.key] ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                      </button>
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        {[{ k: item.key, lbl: 'App' }, { k: 'email_' + item.key, lbl: 'Email' }].map(t => (
+                          <div key={t.k} className="flex flex-col items-center gap-1">
+                            <span className="text-[10px] text-gray-400 font-medium">{t.lbl}</span>
+                            <button
+                              onClick={() => setNotifications(p => ({ ...p, [t.k]: !p[t.k] }))}
+                              className={`w-11 h-6 rounded-full relative transition-colors duration-200 ${notifications[t.k] ? 'bg-primary' : 'bg-gray-200'}`}
+                            >
+                              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifications[t.k] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

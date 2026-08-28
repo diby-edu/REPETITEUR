@@ -679,11 +679,18 @@ export default function TutorDashboardPage() {
                   return (
                     <div key={e.id} className="p-3 border border-gray-100 rounded-xl">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'}</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {par ? `${par.firstName} ${par.lastName?.[0]}.` : '…'}
+                          {e.childLabel && <span className="text-gray-400 font-normal"> · {e.childLabel}</span>}
+                        </p>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex-shrink-0">Actif</span>
                       </div>
                       <p className="text-xs text-primary font-medium mt-0.5">{levelPackages.find(p => p.levelKey === e.levelKey)?.label || 'Contrat'}{e.subject ? ` · ${e.subject}` : ''}</p>
-                      <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1.5">
+                        <Clock size={12} className="text-gray-400 flex-shrink-0" />
+                        <span className="truncate">{e.agreedSchedule || 'Horaires à convenir avec le parent'}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
                         <p className="text-xs text-gray-400">{shortDate(e.startDate)} → {shortDate(e.endDate)} · <strong className="text-gray-700">{formatFCFA(e.monthlyRate)}</strong>/mois</p>
                         <button onClick={() => setEndModal(e)} className="text-xs text-red-500 hover:text-red-600 font-medium">Mettre fin</button>
                       </div>

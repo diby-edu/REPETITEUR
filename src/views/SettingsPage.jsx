@@ -505,10 +505,10 @@ export default function SettingsPage() {
                           <div>
                             <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
                               <UserX size={14} className="text-gray-500" />
-                              Accepter d'être contacté par des répétiteurs
+                              Recevoir des propositions de répétiteurs
                             </p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              Décochez si vous avez déjà trouvé un répétiteur et ne souhaitez plus être sollicité.
+                              Des répétiteurs vérifiés pourront vous proposer leur accompagnement. Décochez si vous avez déjà trouvé et ne souhaitez plus de propositions.
                             </p>
                           </div>
                         </label>

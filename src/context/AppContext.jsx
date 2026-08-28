@@ -499,7 +499,13 @@ export function AppProvider({ children }) {
       .order('last_message_at', { ascending: false })
 
     if (error) { console.error('loadConversations:', error); return }
-    setConversations(data.map(mapConversation))
+    // Préserver les messages déjà chargés (sinon un rechargement de la liste
+    // écrase conv.messages -> les messages "flashent" puis disparaissent).
+    setConversations(prev => data.map(row => {
+      const mapped = mapConversation(row)
+      const existing = prev.find(c => c.id === mapped.id)
+      return existing?.messages?.length ? { ...mapped, messages: existing.messages } : mapped
+    }))
   }, [])
 
   const getConversation = (id) => conversations.find(c => c.id === id)

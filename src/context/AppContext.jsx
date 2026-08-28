@@ -515,7 +515,12 @@ export function AppProvider({ children }) {
   }, [])
 
   const sendMessage = useCallback(async (convId, senderId, content) => {
-    const filtered = filterPhoneAndEmail(content)
+    // Filtre coordonnées : appliqué AVANT contrat, levé dès qu'un contrat actif
+    // existe entre les deux participants (post-contrat = échange libre).
+    const conv = conversations.find(c => c.id === convId)
+    const hasActiveContract = engagements.some(e =>
+      e.status === 'active' && conv?.participants?.includes(e.parentId) && conv?.participants?.includes(e.tutorId))
+    const filtered = hasActiveContract ? content : filterPhoneAndEmail(content)
 
     const { data: msg, error: msgErr } = await supabase
       .from('messages')
@@ -525,7 +530,6 @@ export function AppProvider({ children }) {
 
     if (msgErr) { console.error('sendMessage:', msgErr); return null }
 
-    const conv = conversations.find(c => c.id === convId)
     const receiverId = conv?.participants.find(p => p !== senderId)
     const currentUnread = conv?.unreadCount?.[receiverId] || 0
 
@@ -553,7 +557,7 @@ export function AppProvider({ children }) {
       }
     }))
     return newMsg
-  }, [conversations])
+  }, [conversations, engagements])
 
   const markConversationRead = useCallback(async (convId, userId) => {
     const conv = conversations.find(c => c.id === convId)
@@ -914,15 +918,24 @@ export function AppProvider({ children }) {
   // Répétiteur accepte ou refuse un engagement proposé
   const respondToEngagement = useCallback(async (engagementId, accept) => {
     const newStatus = accept ? 'active' : 'ended'
-    const { error } = await supabase
+    const { data: row, error } = await supabase
       .from('engagements')
       .update({ status: newStatus })
       .eq('id', engagementId)
+      .select()
+      .single()
 
-    if (error) { showToast('Erreur.', 'error'); return }
+    if (error) {
+      showToast(/SUBSCRIPTION_REQUIRED/.test(error.message || '')
+        ? 'Un abonnement payant actif est requis pour accepter une demande.'
+        : 'Erreur.', 'error')
+      return
+    }
     setEngagements(prev => prev.map(e => e.id !== engagementId ? e : { ...e, status: newStatus }))
-    showToast(accept ? 'Contrat accepté ! Les séances sont planifiées.' : 'Contrat refusé.')
-  }, [showToast])
+    // À l'acceptation, on ouvre la messagerie parent ↔ répétiteur.
+    if (accept && row) await getOrCreateConversation(row.parent_id, row.tutor_id)
+    showToast(accept ? 'Demande acceptée ! Vous pouvez échanger via la messagerie.' : 'Demande refusée.')
+  }, [showToast, getOrCreateConversation])
 
   // Propose une modification de planning (parent ou répétiteur)
   const proposeScheduleChange = useCallback(async (engagementId, newSchedule, proposedBy) => {

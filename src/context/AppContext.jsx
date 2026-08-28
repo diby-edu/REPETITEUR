@@ -251,6 +251,7 @@ export function AppProvider({ children }) {
   const { currentUser } = useAuth()
   const [tutors, setTutors] = useState([])
   const [levelPackages, setLevelPackages] = useState([])
+  const [responseStats, setResponseStats] = useState({})   // tutorId → { responded, responseRate, avgHours }
   const [conversations, setConversations] = useState([])
   const [bookings, setBookings] = useState([])
   const [reviews, setReviews] = useState([])
@@ -303,6 +304,26 @@ export function AppProvider({ children }) {
   }, [])
 
   useEffect(() => { loadLevelPackages() }, [loadLevelPackages])
+
+  // ── Réactivité : stats de réponse par répétiteur ────────────
+  const loadResponseStats = useCallback(async () => {
+    const { data, error } = await supabase.from('tutor_response_stats').select('*')
+    if (error) { console.error('loadResponseStats:', error); return }
+    const map = {}
+    ;(data || []).forEach(r => {
+      map[r.tutor_id] = {
+        responded: r.responded || 0,
+        decided: r.decided || 0,
+        responseRate: r.response_rate != null ? Number(r.response_rate) : null,
+        avgHours: r.avg_response_hours != null ? Number(r.avg_response_hours) : null,
+      }
+    })
+    setResponseStats(map)
+  }, [])
+
+  useEffect(() => { loadResponseStats() }, [loadResponseStats])
+
+  const getResponseStats = (tutorId) => responseStats[tutorId] || null
 
   // ── OFFRES DU RÉPÉTITEUR (tutor_offers) ─────────────────────
   const loadTutorOffers = useCallback(async (tutorId) => {
@@ -921,7 +942,7 @@ export function AppProvider({ children }) {
     const newStatus = accept ? 'active' : 'ended'
     const { data: row, error } = await supabase
       .from('engagements')
-      .update({ status: newStatus })
+      .update({ status: newStatus, responded_at: new Date().toISOString() })
       .eq('id', engagementId)
       .select()
       .single()
@@ -1202,6 +1223,7 @@ export function AppProvider({ children }) {
 
       // Forfaits & offres (refonte)
       levelPackages, loadLevelPackages, updateLevelPackage,
+      responseStats, getResponseStats, loadResponseStats,
       loadTutorOffers, saveTutorOffers,
 
       // Conversations & messages

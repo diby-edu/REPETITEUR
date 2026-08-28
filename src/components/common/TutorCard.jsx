@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { MapPin } from 'lucide-react'
 import Avatar from './Avatar'
 import StarRating from './StarRating'
-import { formatFCFA, getInitials } from '../../utils/helpers'
+import { formatFCFA, getInitials, isFastResponder } from '../../utils/helpers'
+import { useApp } from '../../context/AppContext'
 
 // Petit rond de vérification réutilisable
 function VerifCheck({ className = '' }) {
@@ -23,6 +24,8 @@ function DispoPill() {
 }
 
 export default function TutorCard({ tutor, compact = false, list = false }) {
+  const { getResponseStats } = useApp()
+  const fast = isFastResponder(getResponseStats?.(tutor.id))
   const isVerified = tutor.verificationStatus === 'verified'
   const isPremium = tutor.subscription?.plan === 'premium'
   const priceLabel = (tutor.priceMin && tutor.priceMax && tutor.priceMin !== tutor.priceMax)
@@ -75,6 +78,7 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
               <h3 className="font-display font-bold text-gray-900 text-base group-hover:text-primary transition-colors truncate">{tutor.firstName} {tutor.lastName}</h3>
               {recruitable && <DispoPill />}
               {isPremium && <span className="text-[10px] font-bold bg-accent text-white px-2 py-0.5 rounded-full">★ Premium</span>}
+              {fast && <span className="text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full">⚡ Répond vite</span>}
             </div>
             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
               <span className="flex items-center gap-1"><MapPin size={12} />{tutor.quartier}, {tutor.city}</span>
@@ -121,6 +125,7 @@ export default function TutorCard({ tutor, compact = false, list = false }) {
           {tutor.rating > 0
             ? <StarRating rating={tutor.rating} count={tutor.reviewCount} size={13} />
             : <span className="text-[11px] text-gray-400">Nouveau profil</span>}
+          {fast && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary-50 px-2 py-0.5 rounded-full w-fit">⚡ Répond vite</span>}
           <p className="font-display font-extrabold text-primary text-[15px]">{priceLabel}<span className="text-[10px] font-normal text-gray-400 ml-0.5">/mois</span></p>
         </div>
       </Link>

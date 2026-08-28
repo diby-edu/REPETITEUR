@@ -76,6 +76,12 @@ export function filterPhoneAndEmail(text) {
   return filtered
 }
 
+// Répétiteur « réactif » : assez de données + taux élevé + réponse rapide.
+// stats = { responded, responseRate (0-1), avgHours }
+export const isFastResponder = (stats) =>
+  !!stats && (stats.responded || 0) >= 3 && (stats.responseRate || 0) >= 0.8 &&
+  stats.avgHours != null && stats.avgHours <= 24
+
 export function getStatusLabel(status) {
   const labels = {
     pending: 'En attente',

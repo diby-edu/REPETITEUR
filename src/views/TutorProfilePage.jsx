@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import StarRating from '../components/common/StarRating'
 import { VerifiedBadge, PremiumBadge, InactiveBadge } from '../components/common/Badge'
 import { Star, MapPin, Clock, CheckCircle, Heart, ChevronLeft, Send, Home, Building2, Users, Wifi, GraduationCap, ChevronDown, Plus, X } from 'lucide-react'
-import { formatFCFA, formatDate, MODALITIES, filterPhoneAndEmail } from '../utils/helpers'
+import { formatFCFA, formatDate, MODALITIES, filterPhoneAndEmail, isFastResponder } from '../utils/helpers'
 
 // Regroupement des offres par cycle pour l'accordéon (replié par défaut).
 const CYCLE_ORDER = ['primaire', 'college', 'lycee']
@@ -16,7 +16,7 @@ const CYCLE_LABEL = { primaire: 'Primaire', college: 'Collège', lycee: 'Lycée'
 
 export default function TutorProfilePage() {
   const { id } = useParams()
-  const { getTutor, getTutorReviews, createEngagement, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors, levelPackages } = useApp()
+  const { getTutor, getTutorReviews, createEngagement, addReview, addTutorResponse, showToast, toggleFavorite, isFavorite, loadTutorReviews, loadUserFavorites, tutors, levelPackages, getResponseStats } = useApp()
   const { currentUser, isAuthenticated } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('profil')
@@ -191,6 +191,9 @@ export default function TutorProfilePage() {
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 rounded-full px-3 py-1">
                     <CheckCircle size={13} /> Profil vérifié
                   </span>
+                )}
+                {isFastResponder(getResponseStats(tutor.id)) && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 rounded-full px-3 py-1">⚡ Répond vite</span>
                 )}
                 {tutor.rating > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 rounded-full px-3 py-1">

@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
   BarChart3, FileText, ExternalLink, Wallet, Star, MessageSquare, Gift,
 } from 'lucide-react'
-import { formatDateShort, formatFCFA, getDocumentApprovalProgress } from '../utils/helpers'
+import { formatDateShort, formatFCFA, getDocumentApprovalProgress, isFastResponder } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Parrainage', 'Contrats', 'Paiements', 'Avis', 'Conversations']
@@ -212,7 +212,7 @@ function SparklineChart({ data, height = 80 }) {
 }
 
 export default function AdminDashboardPage() {
-  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors, levelPackages, updateLevelPackage } = useApp()
+  const { tutors, reviewDocument, suspendTutor, unsuspendTutor, updateTutorSubscription, showToast, reloadTutors, levelPackages, updateLevelPackage, getResponseStats } = useApp()
   const { setSlot } = useHeaderSlot()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -1160,6 +1160,17 @@ export default function AdminDashboardPage() {
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${user.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                           {user.isActive ? 'Visible' : 'Non visible'}
                         </span>
+                        {(() => {
+                          const rs = getResponseStats(user.id)
+                          if (!rs || rs.decided === 0) return null
+                          const pct = rs.responseRate != null ? Math.round(rs.responseRate * 100) : null
+                          const good = isFastResponder(rs)
+                          return (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${good ? 'bg-primary-50 text-primary-600' : 'bg-orange-50 text-orange-600'}`}>
+                              {good ? '⚡ ' : ''}{pct}% réponse{rs.avgHours != null ? ` · ~${rs.avgHours}h` : ''}
+                            </span>
+                          )
+                        })()}
                       </div>
                     )}
                   </div>

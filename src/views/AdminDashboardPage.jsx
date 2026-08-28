@@ -240,7 +240,7 @@ export default function AdminDashboardPage() {
 
   // Engagement / session / payment stats
   const [engStats, setEngStats]         = useState({ pending: 0, active: 0, ended: 0 })
-  const [sessionStats, setSessionStats] = useState({ upcoming: 0, toConfirm: 0, reported: 0 })
+  const [sessionStats, setSessionStats] = useState({ upcoming: 0, toConfirm: 0, reported: 0, withSessions: 0 })
   const [payStats, setPayStats]         = useState({ pendingDecl: 0, confirmed: 0 })
   const [adminConvs, setAdminConvs]     = useState([])          // modération : toutes les conversations
   const [convProfiles, setConvProfiles] = useState({})          // id → {first_name,last_name,role}
@@ -289,17 +289,16 @@ export default function AdminDashboardPage() {
       pending: p.count || 0, active: a.count || 0, ended: e.count || 0,
     }))
 
-    // Session stats
-    Promise.all([
-      supabase.from('sessions').select('*', { count: 'exact', head: true })
-        .gte('scheduled_date', TODAY).is('parent_report', null),
-      supabase.from('sessions').select('*', { count: 'exact', head: true })
-        .lt('scheduled_date', TODAY).is('parent_report', null),
-      supabase.from('sessions').select('*', { count: 'exact', head: true })
-        .not('parent_report', 'is', null),
-    ]).then(([up, tc, rp]) => setSessionStats({
-      upcoming: up.count || 0, toConfirm: tc.count || 0, reported: rp.count || 0,
-    }))
+    // Séances (nouveau modèle) : compteur sessions_done des contrats.
+    supabase.from('engagements').select('sessions_done, status')
+      .in('status', ['active', 'ended'])
+      .then(({ data }) => {
+        const rows = data || []
+        const validated = rows.reduce((s, e) => s + (e.sessions_done || 0), 0)
+        const withSessions = rows.filter(e => e.status === 'active' && (e.sessions_done || 0) > 0).length
+        setSessionStats({ upcoming: 0, toConfirm: 0, reported: validated, withSessions })
+        setMonthSessionCount(validated)
+      })
 
     // Payment stats
     Promise.all([
@@ -307,10 +306,7 @@ export default function AdminDashboardPage() {
       supabase.from('payments').select('*', { count: 'exact', head: true }).eq('status', 'confirmed'),
     ]).then(([pd, c]) => setPayStats({ pendingDecl: pd.count || 0, confirmed: c.count || 0 }))
 
-    // Séances ce mois (filtré par mois en cours)
-    supabase.from('sessions').select('*', { count: 'exact', head: true })
-      .gte('scheduled_date', MONTH_START)
-      .then(({ count }) => setMonthSessionCount(count || 0))
+    // (séances validées déjà calculées ci-dessus via sessions_done)
 
     // Parents inscrits ce mois
     supabase.from('profiles').select('*', { count: 'exact', head: true })
@@ -1348,20 +1344,19 @@ export default function AdminDashboardPage() {
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Calendar size={16} className="text-secondary" /> Séances
                 </h3>
-                <div className="space-y-2">
-                  {[
-                    { label: 'À venir',       value: sessionStats.upcoming,   color: 'bg-blue-400' },
-                    { label: 'À confirmer',   value: sessionStats.toConfirm,  color: sessionStats.toConfirm > 0 ? 'bg-orange-400' : 'bg-gray-200' },
-                    { label: 'Confirmées',    value: sessionStats.reported,   color: 'bg-green-400' },
-                  ].map(item => (
-                    <div key={item.label} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-20">{item.label}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div className={`${item.color} h-2 rounded-full`} style={{ width: `${totalSessions ? (item.value / totalSessions) * 100 : 0}%` }} />
-                      </div>
-                      <span className="text-xs font-semibold text-gray-700 w-5 text-right">{item.value}</span>
-                    </div>
-                  ))}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Validées (contrats)</span>
+                    <span className="text-sm font-bold text-green-600">{sessionStats.reported}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Contrats avec séances</span>
+                    <span className="text-sm font-bold text-gray-900">{sessionStats.withSessions || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Contrats actifs</span>
+                    <span className="text-sm font-bold text-gray-900">{engStats.active}</span>
+                  </div>
                 </div>
               </div>
 

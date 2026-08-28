@@ -65,6 +65,7 @@ export default function TutorDashboardPage() {
 
   const [referral, setReferral] = useState(null)
   const [refCopied, setRefCopied] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   useEffect(() => {
     if (!tutor?.id) return
     supabase.rpc('my_referral_stats').then(({ data }) => setReferral(data?.[0] || null))
@@ -858,8 +859,26 @@ export default function TutorDashboardPage() {
               {!referral.has_paid && <span className="text-gray-500"> Vos mois gagnés s'appliqueront à votre 1er paiement.</span>}
             </p>
 
+            {/* Code de parrainage (partage à l'oral / SMS) */}
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Votre code</p>
+            <div className="flex gap-2 mb-4">
+              <div className="flex-1 bg-white border-2 border-dashed border-accent rounded-xl flex items-center justify-center py-2.5">
+                <span className="font-display font-extrabold text-2xl tracking-[0.25em] text-accent-700">{referral.code}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(referral.code)
+                  setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000)
+                }}
+                className="btn-primary text-sm px-4 whitespace-nowrap"
+              >
+                {codeCopied ? 'Copié !' : 'Copier'}
+              </button>
+            </div>
+
             {/* Lien de parrainage */}
-            <p className="text-xs font-semibold text-gray-500 mb-1.5">Votre lien de parrainage</p>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Ou partagez le lien</p>
             <div className="flex gap-2 mb-4">
               <input
                 readOnly

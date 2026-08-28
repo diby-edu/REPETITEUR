@@ -91,11 +91,17 @@ export default function RegisterTutorPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [founderSpots, setFounderSpots] = useState(null)
+  const [refCode, setRefCode] = useState('')
+  const [refFromLink, setRefFromLink] = useState(false)
 
-  // Capture du code de parrainage (?ref=) — persisté pendant l'OTP.
+  // Capture du code de parrainage (?ref= ou saisie manuelle) — persisté pendant l'OTP.
   useEffect(() => {
     const r = searchParams.get('ref')
-    if (r) { try { localStorage.setItem('ref_code', r) } catch {} }
+    if (r) {
+      const v = r.trim().toUpperCase()
+      setRefCode(v); setRefFromLink(true)
+      try { localStorage.setItem('ref_code', v) } catch {}
+    }
     supabase.rpc('founder_spots_left').then(({ data }) => setFounderSpots(data))
   }, [])
 
@@ -617,6 +623,24 @@ export default function RegisterTutorPage() {
                     {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+              </div>
+              <div>
+                <label htmlFor="reg-refcode" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Code de parrainage <span className="text-gray-400 font-normal">(facultatif)</span>
+                </label>
+                <input
+                  id="reg-refcode"
+                  type="text"
+                  className="input-field uppercase tracking-widest"
+                  placeholder="Ex. C6ABBEE3"
+                  value={refCode}
+                  onChange={e => {
+                    const v = e.target.value.trim().toUpperCase()
+                    setRefCode(v); setRefFromLink(false)
+                    try { v ? localStorage.setItem('ref_code', v) : localStorage.removeItem('ref_code') } catch {}
+                  }}
+                />
+                {refFromLink && <p className="text-[11px] text-secondary mt-1">✓ Code appliqué depuis votre lien d'invitation.</p>}
               </div>
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
               <button

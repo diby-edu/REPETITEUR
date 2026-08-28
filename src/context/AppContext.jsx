@@ -135,6 +135,7 @@ function mapMessage(row) {
     content: row.content,
     timestamp: row.created_at,
     read: row.read,
+    isModeration: row.is_moderation || false,
   }
 }
 

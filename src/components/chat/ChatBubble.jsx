@@ -253,6 +253,16 @@ export default function ChatBubble() {
                   <p className="text-center text-xs text-gray-400 py-8">Démarrez la conversation</p>
                 )}
                 {messages.map(msg => {
+                  if (msg.isModeration) {
+                    return (
+                      <div key={msg.id} className="flex justify-center">
+                        <div className="max-w-[85%] bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                          <p className="text-[10px] font-bold text-red-600 flex items-center gap-1 mb-0.5"><Shield size={11} /> Modération · MonRépétiteur</p>
+                          <p className="text-sm text-red-900 leading-relaxed break-words">{msg.content}</p>
+                        </div>
+                      </div>
+                    )
+                  }
                   const isMe = msg.senderId === currentUser.id
                   return (
                     <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>

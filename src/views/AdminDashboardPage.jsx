@@ -245,6 +245,8 @@ export default function AdminDashboardPage() {
   const [convProfiles, setConvProfiles] = useState({})          // id → {first_name,last_name,role}
   const [adminConvId, setAdminConvId]   = useState(null)        // conversation ouverte
   const [adminMessages, setAdminMessages] = useState([])
+  const [modMsg, setModMsg]               = useState('')
+  const [modSending, setModSending]       = useState(false)
   const [refCfg, setRefCfg]         = useState(null)   // config parrainage éditable
   const [refOverview, setRefOverview] = useState(null) // vue d'ensemble parrainage
   const [refSaving, setRefSaving]   = useState(false)
@@ -455,6 +457,27 @@ export default function AdminDashboardPage() {
   const convName = (id) => {
     const p = convProfiles[id]
     return p ? `${p.first_name} ${p.last_name}` : '—'
+  }
+
+  // Envoi d'un message de modération (rouge, visible des 2 parties).
+  const sendModeration = async () => {
+    if (!modMsg.trim() || !adminConvId || modSending) return
+    setModSending(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const content = modMsg.trim()
+    const { error } = await supabase.from('messages').insert({
+      conversation_id: adminConvId, sender_id: user.id, content,
+    })
+    if (error) { showToast('Erreur lors de l\'envoi.', 'error'); setModSending(false); return }
+    await supabase.from('conversations').update({
+      last_message_content: content, last_message_at: new Date().toISOString(), last_message_sender: user.id,
+    }).eq('id', adminConvId)
+    setModMsg('')
+    const { data } = await supabase.from('messages').select('*')
+      .eq('conversation_id', adminConvId).order('created_at', { ascending: true })
+    setAdminMessages(data || [])
+    setModSending(false)
+    showToast('Message de modération envoyé.')
   }
 
   // ── Load Parrainage tab ──────────────────────────────────────
@@ -1478,7 +1501,7 @@ export default function AdminDashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-gray-900">Conversations ({adminConvs.length})</h3>
-              <span className="text-xs text-gray-400">Lecture seule — modération</span>
+              <span className="text-xs text-gray-400">Modération — vos messages apparaissent en rouge chez les 2 parties</span>
             </div>
             {adminConvs.length === 0 ? (
               <div className="card text-center py-12">
@@ -1507,23 +1530,51 @@ export default function AdminDashboardPage() {
                   })}
                 </div>
                 {/* Fil */}
-                <div className="card min-h-[300px]">
+                <div className="card min-h-[300px] flex flex-col">
                   {!adminConvId ? (
                     <p className="text-sm text-gray-400 text-center py-16">Sélectionnez une conversation à modérer.</p>
-                  ) : adminMessages.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-16">Aucun message dans cette conversation.</p>
                   ) : (
-                    <div className="space-y-3">
-                      {adminMessages.map(m => (
-                        <div key={m.id} className="border-b border-gray-50 last:border-0 pb-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs font-semibold text-gray-700">{convName(m.sender_id)}</p>
-                            <span className="text-[11px] text-gray-400">{formatDateShort(m.created_at)}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{m.content}</p>
+                    <>
+                      <div className="flex-1 space-y-3 max-h-[55vh] overflow-y-auto">
+                        {adminMessages.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-10">Aucun message. Vous pouvez envoyer un message de modération.</p>
+                        ) : adminMessages.map(m => (
+                          m.is_moderation ? (
+                            <div key={m.id} className="bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-bold text-red-600">🛡️ Modération · MonRépétiteur</p>
+                                <span className="text-[11px] text-red-300">{formatDateShort(m.created_at)}</span>
+                              </div>
+                              <p className="text-sm text-red-900 mt-0.5 whitespace-pre-wrap break-words">{m.content}</p>
+                            </div>
+                          ) : (
+                            <div key={m.id} className="border-b border-gray-50 last:border-0 pb-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-semibold text-gray-700">{convName(m.sender_id)}</p>
+                                <span className="text-[11px] text-gray-400">{formatDateShort(m.created_at)}</span>
+                              </div>
+                              <p className="text-sm text-gray-700 mt-0.5 whitespace-pre-wrap break-words">{m.content}</p>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                      {/* Composer modération */}
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <div className="flex gap-2">
+                          <input
+                            className="input-field text-sm flex-1"
+                            placeholder="Message de modération (rouge, visible des 2 parties)…"
+                            value={modMsg}
+                            onChange={e => setModMsg(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && sendModeration()}
+                          />
+                          <button onClick={sendModeration} disabled={modSending || !modMsg.trim()}
+                                  className="text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl px-4 disabled:opacity-50">
+                            {modSending ? '…' : 'Envoyer'}
+                          </button>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>

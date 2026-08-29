@@ -277,6 +277,7 @@ export default function AdminDashboardPage() {
       if (data) setParents(data.map(p => ({
         id: p.id, firstName: p.first_name, lastName: p.last_name,
         email: p.email, city: p.city, avatarColor: p.avatar_color, role: 'parent',
+        suspended: !!p.suspended,
       })))
     })
 
@@ -494,6 +495,21 @@ export default function AdminDashboardPage() {
     const next = !modGate
     const ok = await setModerationGate(next)
     if (ok) { setModGate(next); showToast(next ? 'Péage activé — les demandes passent par vous.' : 'Péage désactivé.') }
+  }
+
+  // Suspension d'un utilisateur (parent ou répétiteur) via RPC admin.
+  // Pose profiles.suspended (blocage login) + tutors.suspended (recherche).
+  const toggleSuspend = async (user, suspended) => {
+    const { error } = await supabase.rpc('admin_set_user_suspended', { p_user: user.id, p_suspended: suspended })
+    if (error) { showToast('Erreur lors de la suspension.', 'error'); return }
+    if (user.role === 'parent') {
+      setParents(prev => prev.map(p => p.id === user.id ? { ...p, suspended } : p))
+    } else {
+      reloadTutors()
+    }
+    showToast(suspended
+      ? 'Compte suspendu — l\'utilisateur ne peut plus se connecter.'
+      : 'Compte réactivé.')
   }
   const handleRelease = async (id) => {
     setModBusy(id)
@@ -1179,9 +1195,9 @@ export default function AdminDashboardPage() {
                     {user.role === 'tutor' && (
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={user.verificationStatus} />
-                        {/* Visibilité réelle en recherche (is_active), pas le statut d'abonnement */}
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${user.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {user.isActive ? 'Visible' : 'Non visible'}
+                        {/* Visibilité réelle en recherche : vérifié && non suspendu */}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(user.verificationStatus === 'verified' && !user.suspended) ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {(user.verificationStatus === 'verified' && !user.suspended) ? 'Visible' : 'Non visible'}
                         </span>
                         {(() => {
                           const rs = getResponseStats(user.id)
@@ -1199,15 +1215,15 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {user.rating > 0 && <StarRating rating={user.rating} count={user.reviewCount} size={12} />}
-                    {user.role === 'tutor' && !user.suspended && (
-                      <button onClick={() => suspendTutor(user.id)} className="text-xs text-red-500 hover:text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50">
+                    {user.role !== 'admin' && !user.suspended && (
+                      <button onClick={() => toggleSuspend(user, true)} className="text-xs text-red-500 hover:text-red-600 font-medium px-2 py-1 rounded-lg hover:bg-red-50">
                         Suspendre
                       </button>
                     )}
-                    {user.role === 'tutor' && user.suspended && (
+                    {user.role !== 'admin' && user.suspended && (
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs text-red-500 font-semibold">Suspendu</span>
-                        <button onClick={() => unsuspendTutor(user.id)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50">
+                        <button onClick={() => toggleSuspend(user, false)} className="text-xs text-green-600 hover:text-green-700 font-medium px-2 py-1 rounded-lg hover:bg-green-50">
                           Réactiver
                         </button>
                       </div>

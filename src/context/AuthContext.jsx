@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
       avatarColor: profile.avatar_color,
       avatarUrl: profile.avatar_url,
       joinDate: profile.join_date,
+      suspended: !!profile.suspended,
       // Données parent
       subjectsNeeded: profile.subjects_needed || [],
       childLevel: profile.child_level || null,
@@ -79,7 +80,8 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const profile = await fetchProfile(session.user.id)
-        setCurrentUser(profile)
+        if (profile?.suspended) { await supabase.auth.signOut(); setCurrentUser(null) }
+        else setCurrentUser(profile)
       }
     }).catch((err) => {
       console.error('[auth] getSession a échoué:', err)
@@ -92,7 +94,8 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const profile = await fetchProfile(session.user.id)
-        setCurrentUser(profile)
+        if (profile?.suspended) { await supabase.auth.signOut(); setCurrentUser(null) }
+        else setCurrentUser(profile)
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null)
       }
@@ -106,6 +109,11 @@ export function AuthProvider({ children }) {
     if (error) return { success: false, error: error.message || 'Email ou mot de passe incorrect.' }
     const profile = await fetchProfile(data.user.id)
     if (!profile) return { success: false, error: 'Profil introuvable. Contactez l\'administrateur.' }
+    if (profile.suspended) {
+      await supabase.auth.signOut()
+      setCurrentUser(null)
+      return { success: false, error: 'Votre compte a été suspendu. Contactez le support.' }
+    }
     setCurrentUser(profile)
     return { success: true, user: profile }
   }

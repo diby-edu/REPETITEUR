@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '../../context/AuthContext'
 import { useApp } from '../../context/AppContext'
-import { MessageCircle, Heart, Settings, Bell, Menu } from 'lucide-react'
+import { MessageCircle, Heart, Settings, Bell, Menu, Search } from 'lucide-react'
 import DashboardSidebar from './DashboardSidebar'
 
 // Pages inject their action button here via useHeaderSlot()
@@ -96,8 +96,20 @@ export default function DashboardLayout({ children }) {
               </button>
               <div className="flex-1 min-w-0">{slot}</div>
             </div>
-            <div className="flex items-center gap-0.5">
-              {icons.map(item => <TopIconBtn key={item.href + item.title} {...item} />)}
+            <div className="flex items-center gap-2">
+              {role === 'parent' && (
+                <Link
+                  href="/recherche"
+                  className="flex items-center gap-2 bg-primary text-white text-sm font-semibold rounded-xl px-3 sm:px-3.5 py-2 hover:bg-primary-600 transition-colors flex-shrink-0"
+                  title="Trouver un répétiteur"
+                >
+                  <Search size={15} />
+                  <span className="hidden sm:inline">Trouver un répétiteur</span>
+                </Link>
+              )}
+              <div className="flex items-center gap-0.5">
+                {icons.map(item => <TopIconBtn key={item.href + item.title} {...item} />)}
+              </div>
             </div>
           </header>
           <main className="flex-1 overflow-y-auto">

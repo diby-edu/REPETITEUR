@@ -2,16 +2,17 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useApp } from '../context/AppContext'
+import MarketplaceShell from '../components/layout/MarketplaceShell'
 import TutorCard from '../components/common/TutorCard'
 import { SUBJECTS, CITIES } from '../data/constants'
 import { MODALITIES } from '../utils/helpers'
-import { Search, SlidersHorizontal, X, LayoutGrid, List, Home, Building2, Users, Wifi } from 'lucide-react'
+import { Search, SlidersHorizontal, X, LayoutGrid, List } from 'lucide-react'
 
 export default function SearchPage() {
   const searchParams = useSearchParams()
   const { tutors, levelPackages } = useApp()
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [viewMode, setViewMode] = useState('grid')
+  const [viewMode, setViewMode] = useState('list')
 
   const [filters, setFilters] = useState({
     query: searchParams.get('q') || '',
@@ -33,7 +34,6 @@ export default function SearchPage() {
     let result = tutors.filter(t =>
       t.verificationStatus === 'verified' && !t.suspended)
 
-    // matières couvertes par les offres du répétiteur (par classe)
     const offerSubjects = t => (t.offers || []).flatMap(o => o.subjects || [])
 
     if (filters.query) {
@@ -74,193 +74,83 @@ export default function SearchPage() {
   const hasActiveFilters = filters.city || filters.subject || filters.levelKey ||
     filters.minPrice || filters.maxPrice || filters.modality || filters.verifiedOnly
 
-  const FilterPanel = () => (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Matière</label>
-        <select className="input-field" value={filters.subject} onChange={e => setFilter('subject', e.target.value)}>
-          <option value="">Toutes les matières</option>
-          {SUBJECTS.map(s => <option key={s}>{s}</option>)}
-        </select>
+  const selectCls = 'text-sm rounded-xl border border-gray-200 bg-white px-3 py-2 text-gray-700 focus:border-primary focus:ring-1 focus:ring-primary outline-none'
+
+  // ── Barre de filtres HORIZONTALE ──────────────────────────
+  const FilterBar = () => (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="hidden lg:flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide mr-1">
+        <SlidersHorizontal size={14} /> Filtres
+      </span>
+
+      <select className={selectCls} value={filters.subject} onChange={e => setFilter('subject', e.target.value)}>
+        <option value="">Toutes les matières</option>
+        {SUBJECTS.map(s => <option key={s}>{s}</option>)}
+      </select>
+
+      <select className={selectCls} value={filters.levelKey} onChange={e => setFilter('levelKey', e.target.value)}>
+        <option value="">Toutes les classes</option>
+        {levelPackages.map(p => <option key={p.levelKey} value={p.levelKey}>{p.label}</option>)}
+      </select>
+
+      <select className={selectCls} value={filters.city} onChange={e => setFilter('city', e.target.value)}>
+        <option value="">Toutes les villes</option>
+        {CITIES.map(c => <option key={c}>{c}</option>)}
+      </select>
+
+      <select className={selectCls} value={filters.modality} onChange={e => setFilter('modality', e.target.value)}>
+        <option value="">Toutes les modalités</option>
+        {MODALITIES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+      </select>
+
+      <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-2.5 py-1.5">
+        <span className="text-xs text-gray-400">FCFA</span>
+        <input type="number" placeholder="Min" step="5000" min="5000"
+               className="w-16 text-sm outline-none bg-transparent text-gray-700"
+               value={filters.minPrice} onChange={e => setFilter('minPrice', e.target.value)} />
+        <span className="text-gray-300">–</span>
+        <input type="number" placeholder="Max" step="5000" min="5000"
+               className="w-16 text-sm outline-none bg-transparent text-gray-700"
+               value={filters.maxPrice} onChange={e => setFilter('maxPrice', e.target.value)} />
       </div>
 
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Classe</label>
-        <select className="input-field" value={filters.levelKey} onChange={e => setFilter('levelKey', e.target.value)}>
-          <option value="">Toutes les classes</option>
-          {levelPackages.map(p => <option key={p.levelKey} value={p.levelKey}>{p.label}</option>)}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Ville</label>
-        <select className="input-field" value={filters.city} onChange={e => setFilter('city', e.target.value)}>
-          <option value="">Toutes les villes</option>
-          {CITIES.map(c => <option key={c}>{c}</option>)}
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Tarif mensuel (FCFA)</label>
-        <div className="flex gap-2 items-center">
-          <input
-            type="number"
-            placeholder="Min"
-            className="input-field"
-            value={filters.minPrice}
-            onChange={e => setFilter('minPrice', e.target.value)}
-            step="5000"
-            min="5000"
-          />
-          <span className="text-gray-400 text-sm">–</span>
-          <input
-            type="number"
-            placeholder="Max"
-            className="input-field"
-            value={filters.maxPrice}
-            onChange={e => setFilter('maxPrice', e.target.value)}
-            step="5000"
-            min="5000"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">Modalité de cours</label>
-        <div className="grid grid-cols-2 gap-2">
-          {MODALITIES.map(m => {
-            const icons = {
-              domicile_parent: <Home size={14} />,
-              domicile_repetiteur: <Building2 size={14} />,
-              lieu_neutre: <Users size={14} />,
-              en_ligne: <Wifi size={14} />,
-            }
-            const active = filters.modality === m.id
-            return (
-              <button
-                key={m.id}
-                onClick={() => setFilter('modality', active ? '' : m.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-medium transition-colors text-left ${
-                  active
-                    ? 'border-primary bg-primary-50 text-primary'
-                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                {icons[m.id]}
-                {m.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={filters.verifiedOnly}
-            onChange={e => setFilter('verifiedOnly', e.target.checked)}
-            className="accent-primary w-4 h-4"
-          />
-          <span className="text-sm font-medium text-gray-700">Répétiteurs vérifiés uniquement</span>
-        </label>
-      </div>
+      <label className={`flex items-center gap-1.5 cursor-pointer rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${filters.verifiedOnly ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600'}`}>
+        <input type="checkbox" checked={filters.verifiedOnly}
+               onChange={e => setFilter('verifiedOnly', e.target.checked)} className="accent-primary w-4 h-4" />
+        Vérifiés uniquement
+      </label>
 
       {hasActiveFilters && (
-        <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium">
-          <X size={14} />
-          Effacer les filtres
+        <button onClick={clearFilters} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-600 font-medium px-2 py-2">
+          <X size={14} /> Effacer
         </button>
       )}
     </div>
   )
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-surface">
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 sticky top-16 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-3">
-            {/* Search input */}
-            <div className="flex items-center gap-2 flex-1 bg-gray-50 rounded-xl px-3 py-2">
-              <Search size={18} className="text-gray-400 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Rechercher un répétiteur, une matière..."
-                className="bg-transparent flex-1 outline-none text-sm text-gray-800 placeholder:text-gray-400"
-                value={filters.query}
-                onChange={e => setFilter('query', e.target.value)}
-              />
-              {filters.query && (
-                <button onClick={() => setFilter('query', '')}><X size={16} className="text-gray-400" /></button>
-              )}
-            </div>
+    <MarketplaceShell>
+      <div className="bg-surface min-h-full">
+        {/* Barre du haut : recherche + tri + vue + filtres */}
+        <div className="bg-white border-b border-gray-100 sticky top-0 z-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1 bg-gray-50 rounded-xl px-3 py-2">
+                <Search size={18} className="text-gray-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un répétiteur, une matière..."
+                  className="bg-transparent flex-1 outline-none text-sm text-gray-800 placeholder:text-gray-400"
+                  value={filters.query}
+                  onChange={e => setFilter('query', e.target.value)}
+                />
+                {filters.query && (
+                  <button onClick={() => setFilter('query', '')}><X size={16} className="text-gray-400" /></button>
+                )}
+              </div>
 
-            {/* Sort */}
-            <select
-              className="hidden sm:block input-field w-44 text-sm py-2"
-              value={filters.sortBy}
-              onChange={e => setFilter('sortBy', e.target.value)}
-            >
-              <option value="pertinence">Pertinence</option>
-              <option value="note">Meilleures notes</option>
-              <option value="prix_asc">Prix croissant</option>
-              <option value="prix_desc">Prix décroissant</option>
-            </select>
-
-            {/* View mode */}
-            <div className="hidden sm:flex items-center bg-gray-100 rounded-lg p-1">
-              <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-400'}`}>
-                <LayoutGrid size={16} />
-              </button>
-              <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-400'}`}>
-                <List size={16} />
-              </button>
-            </div>
-
-            {/* Filter toggle (mobile) */}
-            <button
-              onClick={() => setFiltersOpen(!filtersOpen)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-colors lg:hidden ${filtersOpen ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600'}`}
-            >
-              <SlidersHorizontal size={16} />
-              Filtres
-              {hasActiveFilters && (
-                <span className="w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">!</span>
-              )}
-            </button>
-          </div>
-
-          {/* Mobile filters dropdown */}
-          {filtersOpen && (
-            <div className="lg:hidden mt-3 pt-3 border-t border-gray-100">
-              <FilterPanel />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex gap-6">
-          {/* Sidebar filters (desktop) */}
-          <aside className="hidden lg:block w-64 flex-shrink-0">
-            <div className="card sticky top-32">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <SlidersHorizontal size={16} />
-                Filtres
-              </h2>
-              <FilterPanel />
-            </div>
-          </aside>
-
-          {/* Results */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-gray-600 text-sm">
-                <span className="font-semibold text-gray-900">{filtered.length}</span> répétiteur{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
-              </p>
               <select
-                className="sm:hidden input-field w-44 text-sm py-2"
+                className={`hidden sm:block ${selectCls} w-44`}
                 value={filters.sortBy}
                 onChange={e => setFilter('sortBy', e.target.value)}
               >
@@ -269,30 +159,62 @@ export default function SearchPage() {
                 <option value="prix_asc">Prix croissant</option>
                 <option value="prix_desc">Prix décroissant</option>
               </select>
-            </div>
 
-            {filtered.length === 0 ? (
-              <div className="text-center py-20">
-                <Search size={48} className="text-gray-300 mx-auto mb-4" />
-                <h3 className="font-semibold text-gray-700 text-lg mb-2">Aucun répétiteur trouvé</h3>
-                <p className="text-gray-400 text-sm">Essayez d'élargir vos critères de recherche.</p>
-                <button onClick={clearFilters} className="btn-outline mt-4 text-sm">
-                  Effacer les filtres
+              <div className="hidden sm:flex items-center bg-gray-100 rounded-lg p-1">
+                <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-400'}`} title="Vue liste">
+                  <List size={16} />
+                </button>
+                <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-400'}`} title="Vue grille">
+                  <LayoutGrid size={16} />
                 </button>
               </div>
-            ) : (
-              <div className={viewMode === 'grid'
-                ? 'grid sm:grid-cols-2 xl:grid-cols-3 gap-5'
-                : 'flex flex-col gap-4'
-              }>
-                {filtered.map(tutor => (
-                  <TutorCard key={tutor.id} tutor={tutor} list={viewMode === 'list'} />
-                ))}
-              </div>
-            )}
+
+              {/* Toggle filtres (mobile) */}
+              <button
+                onClick={() => setFiltersOpen(!filtersOpen)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-colors lg:hidden ${filtersOpen ? 'border-primary bg-primary-50 text-primary' : 'border-gray-200 text-gray-600'}`}
+              >
+                <SlidersHorizontal size={16} />
+                {hasActiveFilters && <span className="w-4 h-4 bg-primary text-white text-xs rounded-full flex items-center justify-center">!</span>}
+              </button>
+            </div>
+
+            {/* Barre de filtres horizontale : desktop toujours, mobile si ouvert */}
+            <div className={`${filtersOpen ? 'block' : 'hidden'} lg:block mt-3 pt-3 border-t border-gray-100`}>
+              <FilterBar />
+            </div>
           </div>
         </div>
+
+        {/* Résultats pleine largeur */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-gray-600 text-sm">
+              <span className="font-semibold text-gray-900">{filtered.length}</span> répétiteur{filtered.length > 1 ? 's' : ''} trouvé{filtered.length > 1 ? 's' : ''}
+            </p>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="text-center py-20">
+              <Search size={48} className="text-gray-300 mx-auto mb-4" />
+              <h3 className="font-semibold text-gray-700 text-lg mb-2">Aucun répétiteur trouvé</h3>
+              <p className="text-gray-400 text-sm">Essayez d'élargir vos critères de recherche.</p>
+              {hasActiveFilters && (
+                <button onClick={clearFilters} className="btn-outline mt-4 text-sm">Effacer les filtres</button>
+              )}
+            </div>
+          ) : (
+            <div className={viewMode === 'grid'
+              ? 'grid sm:grid-cols-2 xl:grid-cols-3 gap-5'
+              : 'flex flex-col gap-4'
+            }>
+              {filtered.map(tutor => (
+                <TutorCard key={tutor.id} tutor={tutor} list={viewMode === 'list'} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </MarketplaceShell>
   )
 }

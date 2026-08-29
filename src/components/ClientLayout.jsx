@@ -1,6 +1,6 @@
 'use client'
 import { usePathname } from 'next/navigation'
-import { AuthProvider } from '../context/AuthContext'
+import { AuthProvider, useAuth } from '../context/AuthContext'
 import { AppProvider } from '../context/AppContext'
 import { ChatBubbleProvider } from '../context/ChatBubbleContext'
 import Navbar from './common/Navbar'
@@ -12,8 +12,12 @@ import { useApp } from '../context/AppContext'
 const DASHBOARD_PREFIXES = [
   '/tableau-de-bord', '/admin',
   '/messagerie', '/reservations', '/favoris',
-  '/notifications', '/parametres', '/abonnement',
+  '/notifications', '/parametres', '/abonnement', '/recruter',
 ]
+
+// Pages « marketplace » : shell dashboard quand l'utilisateur est connecté,
+// Navbar publique sinon (elles restent accessibles aux visiteurs).
+const MARKETPLACE_PREFIXES = ['/recherche', '/repetiteur']
 
 function ToastWrapper() {
   const { toast } = useApp()
@@ -23,7 +27,10 @@ function ToastWrapper() {
 
 function Shell({ children }) {
   const pathname = usePathname()
-  const isDashboard = DASHBOARD_PREFIXES.some(p => pathname?.startsWith(p))
+  const { currentUser } = useAuth()
+  const isDashboard =
+    DASHBOARD_PREFIXES.some(p => pathname?.startsWith(p)) ||
+    (!!currentUser && MARKETPLACE_PREFIXES.some(p => pathname?.startsWith(p)))
 
   if (isDashboard) {
     return (

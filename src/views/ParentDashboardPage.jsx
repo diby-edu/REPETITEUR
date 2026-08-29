@@ -13,7 +13,7 @@ import {
   Users, Send, MapPin, Star,
 } from 'lucide-react'
 import { formatFCFA } from '../utils/helpers'
-import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
 // ── Date helpers ─────────────────────────────────────────────
 const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
@@ -59,7 +59,6 @@ export default function ParentDashboardPage() {
     reportSession, declarePayment, endEngagement, setSessionsDone, runMaintenanceTasks, levelPackages,
   } = useApp()
   const { openChat } = useChatBubble()
-  const { setSlot } = useHeaderSlot()
   const parent = currentUser
 
   // ── Session report modal ────────────────────────────────────
@@ -86,15 +85,6 @@ export default function ParentDashboardPage() {
   const [wantsContinue, setWantsContinue] = useState(null)
   const [payConfirm, setPayConfirm]       = useState(false)
   const [payLoading, setPayLoading]       = useState(false)
-
-  useEffect(() => {
-    setSlot(
-      <Link href="/recherche" className="btn-primary text-sm flex items-center gap-2">
-        <Search size={15} /> Trouver un répétiteur
-      </Link>
-    )
-    return () => setSlot(null)
-  }, [])
 
   useEffect(() => {
     if (!parent?.id) return

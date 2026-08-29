@@ -141,8 +141,11 @@ export default function DashboardSidebar({ isOpen = false, onClose = () => {} })
         </div>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      {/* Zone défilante : navigation + résumé ensemble, pour que le résumé ne
+          fige plus l'espace de la nav (sinon les onglets du bas sont cachés sur
+          écran court). Tous les items restent atteignables par défilement. */}
+      <div className="flex-1 overflow-y-auto">
+      <nav className="px-3 py-4 space-y-0.5">
         {items.map(({ label, href, icon: Icon }) => {
           const badge = role === 'admin' && label === 'Vérifications' && pendingT.length > 0 ? pendingT.length : null
           return (
@@ -168,9 +171,9 @@ export default function DashboardSidebar({ isOpen = false, onClose = () => {} })
         })}
       </nav>
 
-      {/* RÉSUMÉ mini-stats */}
+      {/* RÉSUMÉ mini-stats (dans la zone défilante) */}
       {resumeRows.length > 0 && (
-        <div className="flex-shrink-0 px-4 py-3 border-t border-white/10">
+        <div className="px-4 py-3 border-t border-white/10">
           <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Résumé</p>
           {resumeRows.map(row => (
             <div key={row.label} className="flex justify-between items-center py-1">
@@ -180,6 +183,7 @@ export default function DashboardSidebar({ isOpen = false, onClose = () => {} })
           ))}
         </div>
       )}
+      </div>{/* fin zone défilante */}
 
       {/* Logout */}
       <div className="flex-shrink-0 px-3 pt-3 pb-5 border-t border-white/10">

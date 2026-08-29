@@ -422,13 +422,17 @@ export default function AdminDashboardPage() {
     supabase.from('reviews').select('*').order('created_at', { ascending: false }).limit(200)
       .then(async ({ data: revs }) => {
         if (!revs?.length) { setReviewsList([]); return }
-        const ids = [...new Set([...revs.map(r => r.reviewer_id), ...revs.map(r => r.tutor_id)].filter(Boolean))]
+        const ids = [...new Set([...revs.map(r => r.parent_id), ...revs.map(r => r.tutor_id)].filter(Boolean))]
         const { data: profiles } = ids.length
           ? await supabase.from('profiles').select('id, first_name, last_name').in('id', ids)
           : { data: [] }
         const pMap = {}
-        profiles?.forEach(p => { pMap[p.id] = `${p.first_name} ${p.last_name}` })
-        setReviewsList(revs.map(r => ({ ...r, reviewerName: pMap[r.reviewer_id] || '—', tutorName: pMap[r.tutor_id] || '—' })))
+        profiles?.forEach(p => { pMap[p.id] = `${p.first_name || ''} ${p.last_name || ''}`.trim() })
+        setReviewsList(revs.map(r => ({
+          ...r,
+          reviewerName: (r.parent_name || pMap[r.parent_id] || '').trim() || '—',
+          tutorName: pMap[r.tutor_id] || '—',
+        })))
       })
   }, [activeTab])
 
@@ -690,6 +694,7 @@ export default function AdminDashboardPage() {
         const preview = (() => { const d = new Date(); d.setMonth(d.getMonth() + Number(subMonths)); return d.toISOString().split('T')[0] })()
         const verified = subModal.verificationStatus === 'verified'
         const price = subPlan === 'premium' ? 5000 : 3000
+        const isRenewal = subModal.subscription?.status === 'active' && subModal.subscription?.plan && subModal.subscription.plan !== 'gratuit'
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl p-6 max-w-md w-full">
@@ -698,7 +703,7 @@ export default function AdminDashboardPage() {
                   <Wallet size={20} className="text-accent" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Activer un abonnement</h3>
+                  <h3 className="font-semibold text-gray-900">{isRenewal ? 'Prolonger l\'abonnement' : 'Activer un abonnement'}</h3>
                   <p className="text-sm text-gray-500">{subModal.firstName} {subModal.lastName}</p>
                 </div>
               </div>
@@ -740,7 +745,7 @@ export default function AdminDashboardPage() {
                   disabled={subBusy}
                   className="flex-1 bg-secondary text-white font-semibold px-6 py-3 rounded-full hover:bg-secondary-600 transition-colors disabled:opacity-60"
                 >
-                  {subBusy ? 'Activation…' : 'Activer l\'abonnement'}
+                  {subBusy ? (isRenewal ? 'Prolongation…' : 'Activation…') : (isRenewal ? 'Prolonger l\'abonnement' : 'Activer l\'abonnement')}
                 </button>
               </div>
             </div>
@@ -852,9 +857,9 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-100 text-center">
                   {[
-                    { label: 'Séances à venir',  value: sessionStats.upcoming,  color: 'text-blue-600' },
-                    { label: 'À confirmer',       value: sessionStats.toConfirm, color: sessionStats.toConfirm > 0 ? 'text-orange-500' : 'text-gray-900' },
-                    { label: 'Cette semaine',     value: weekStats.sessions,     color: 'text-green-600' },
+                    { label: 'Séances validées',  value: sessionStats.reported,     color: 'text-green-600' },
+                    { label: 'Contrats suivis',   value: sessionStats.withSessions, color: 'text-primary' },
+                    { label: 'Nouveaux · 7j',     value: weekStats.engagements,     color: 'text-blue-600' },
                   ].map(s => (
                     <div key={s.label}>
                       <p className={`text-2xl font-black ${s.color} tabular-nums`}>{s.value}</p>
@@ -1260,7 +1265,7 @@ export default function AdminDashboardPage() {
                     }}
                     className="flex-shrink-0 text-xs font-bold text-white bg-secondary hover:bg-secondary-600 px-3 py-2 rounded-xl whitespace-nowrap"
                   >
-                    Activer
+                    {tutor.subscription?.status === 'active' && tutor.subscription?.plan && tutor.subscription.plan !== 'gratuit' ? 'Prolonger' : 'Activer'}
                   </button>
                 </div>
               ))}

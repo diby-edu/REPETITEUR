@@ -49,7 +49,7 @@ create or replace view public.public_tutors as
     t.verification_status, t.rejection_reason,
     t.subscription_plan, t.subscription_start, t.subscription_end, t.subscription_status,
     t.rating, t.review_count, t.session_count, t.profile_views, t.monthly_requests,
-    t.is_active, t.suspended, t.is_founder,
+    t.is_active, t.suspended,
     (
       select coalesce(array_agg(d->>'name'), '{}'::text[])
       from jsonb_array_elements(coalesce(t.documents->'diplomes', '[]'::jsonb)) d
@@ -64,7 +64,10 @@ create or replace view public.public_tutors as
         '[]'::jsonb)
       from public.tutor_offers o
       where o.tutor_id = p.id and o.active
-    ) as offers
+    ) as offers,
+    -- Ajout V1 en DERNIÈRE position (create or replace view n'autorise que
+    -- l'ajout de colonnes à la fin, jamais l'insertion au milieu).
+    t.is_founder
   from public.profiles p
   join public.tutors t on t.id = p.id
   where p.role = 'tutor';

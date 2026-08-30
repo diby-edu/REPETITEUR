@@ -15,7 +15,7 @@ import {
   Users, Send, MapPin, GraduationCap, FileText, Wallet,
   Check, X,
 } from 'lucide-react'
-import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel } from '../utils/helpers'
+import { formatFCFA, formatDateShort, getSubscriptionDaysLeft, getStatusLabel, hasActivePaidSub } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 import StarRating from '../components/common/StarRating'
 
@@ -256,6 +256,7 @@ export default function TutorDashboardPage() {
   const unreadMessages    = conversations.reduce((sum, c) => sum + (c.unreadCount?.[tutor?.id] || 0), 0)
   const daysLeft          = getSubscriptionDaysLeft(tutor.subscription?.endDate)
   const isSubscriptionActive = tutor.subscription?.status === 'active'
+  const isPaidActive      = hasActivePaidSub(tutor)                     // abo Standard/Premium en cours
   const isVerified        = tutor.verificationStatus === 'verified'
   const myReviews         = getTutorReviews(tutor.id)
   const isPremium         = tutor.subscription?.plan === 'premium'
@@ -335,14 +336,27 @@ export default function TutorDashboardPage() {
 
         {/* Alerts */}
         <div className="space-y-3 mb-6">
-          {!isSubscriptionActive && !tutor.subscription?.status && (
+          {/* V1 : vérifié mais NON fondateur et NON abonné payant → invisible en recherche */}
+          {isVerified && !tutor.isFounder && !isPaidActive && (
             <div className="flex items-start gap-3 bg-orange-50 border border-orange-200 rounded-xl p-4">
               <AlertCircle size={20} className="text-orange-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-orange-800">Votre profil est invisible</p>
-                <p className="text-sm text-orange-700">Abonnez-vous pour apparaître dans les recherches, recevoir des demandes de contrat et discuter avec les parents.</p>
+                <p className="text-sm font-semibold text-orange-800">Vous n'apparaissez pas dans les recherches</p>
+                <p className="text-sm text-orange-700">Abonnez-vous pour être visible, recevoir des demandes de contrat et discuter avec les parents.</p>
               </div>
               <Link href="/abonnement" className="text-xs font-semibold text-orange-700 bg-orange-100 hover:bg-orange-200 px-3 py-1.5 rounded-lg whitespace-nowrap">Choisir un plan</Link>
+            </div>
+          )}
+
+          {/* V1 : fondateur visible gratuitement, mais devra payer pour accepter un contrat */}
+          {isVerified && tutor.isFounder && !isPaidActive && (
+            <div className="flex items-start gap-3 bg-secondary-50 border border-secondary-100 rounded-xl p-4">
+              <span className="text-xl flex-shrink-0 leading-none">★</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-secondary-700">Fondateur — visible gratuitement</p>
+                <p className="text-sm text-secondary-600">Vous apparaissez dans les recherches sans payer. Un abonnement sera requis pour accepter votre 1er contrat.</p>
+              </div>
+              <Link href="/abonnement" className="text-xs font-semibold text-secondary-700 bg-secondary-100 hover:bg-secondary-200 px-3 py-1.5 rounded-lg whitespace-nowrap">Voir les plans</Link>
             </div>
           )}
 

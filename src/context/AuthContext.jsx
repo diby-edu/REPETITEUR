@@ -67,6 +67,7 @@ export function AuthProvider({ children }) {
         monthlyRequests: tutor.monthly_requests,
         isActive: tutor.is_active,
         suspended: tutor.suspended,
+        isFounder: tutor.is_founder,
       }),
     }
   }

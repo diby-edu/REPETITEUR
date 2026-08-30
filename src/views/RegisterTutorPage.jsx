@@ -567,7 +567,7 @@ export default function RegisterTutorPage() {
                     🎉 Offre fondateur — plus que {founderSpots} place{founderSpots > 1 ? 's' : ''} !
                   </p>
                   <p className="text-xs text-accent-700 mt-0.5">
-                    Les {founderSpots > 1 ? 'premiers' : 'derniers'} répétiteurs inscrits sont <strong>gratuits jusqu'à leur 1er élève</strong>. Ne tardez pas.
+                    Les {founderSpots > 1 ? 'premiers' : 'derniers'} répétiteurs inscrits restent <strong>visibles gratuitement</strong> (sans abonnement) tant qu'ils sont vérifiés. Ne tardez pas.
                   </p>
                 </div>
               )}

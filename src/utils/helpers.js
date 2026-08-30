@@ -82,6 +82,19 @@ export const isFastResponder = (stats) =>
   !!stats && (stats.responded || 0) >= 3 && (stats.responseRate || 0) >= 0.8 &&
   stats.avgHours != null && stats.avgHours <= 24
 
+// Abonnement payant actif (Standard/Premium en cours).
+export const hasActivePaidSub = (t) =>
+  t?.subscription?.status === 'active' &&
+  !!t?.subscription?.plan && t.subscription.plan !== 'gratuit'
+
+// V1 « seed-then-gate » : un répétiteur est VISIBLE (recherche + listes) s'il est
+// vérifié, non suspendu, ET (fondateur OU abonné payant actif). La recrutabilité
+// (bouton « Je recrute ») reste, elle, `vérifié && !suspendu` — un profil atteint
+// par lien direct reste recrutable même s'il n'apparaît pas dans les recherches.
+export const isTutorVisible = (t) =>
+  t?.verificationStatus === 'verified' && !t?.suspended &&
+  (t?.isFounder || hasActivePaidSub(t))
+
 export function getStatusLabel(status) {
   const labels = {
     pending: 'En attente',

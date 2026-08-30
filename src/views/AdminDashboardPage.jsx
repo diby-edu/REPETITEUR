@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, Eye, AlertTriangle, Search,
   BarChart3, FileText, ExternalLink, Wallet, Star, MessageSquare, Gift,
 } from 'lucide-react'
-import { formatDateShort, formatFCFA, getDocumentApprovalProgress, isFastResponder } from '../utils/helpers'
+import { formatDateShort, formatFCFA, getDocumentApprovalProgress, isFastResponder, isTutorVisible } from '../utils/helpers'
 import DashboardLayout, { useHeaderSlot } from '../components/layout/DashboardLayout'
 
 const TABS = ['Vue globale', 'Vérifications', 'Utilisateurs', 'Abonnements', 'Forfaits', 'Parrainage', 'Contrats', 'Paiements', 'Avis', 'Conversations']
@@ -1195,10 +1195,11 @@ export default function AdminDashboardPage() {
                     {user.role === 'tutor' && (
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={user.verificationStatus} />
-                        {/* Visibilité réelle en recherche : vérifié && non suspendu */}
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${(user.verificationStatus === 'verified' && !user.suspended) ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {(user.verificationStatus === 'verified' && !user.suspended) ? 'Visible' : 'Non visible'}
+                        {/* Visibilité réelle en recherche : vérifié && !suspendu && (fondateur || abo payant) */}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isTutorVisible(user) ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {isTutorVisible(user) ? 'Visible' : 'Non visible'}
                         </span>
+                        {user.isFounder && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent-50 text-accent-700">★ Fondateur</span>}
                         {(() => {
                           const rs = getResponseStats(user.id)
                           if (!rs || rs.decided === 0) return null
@@ -1684,18 +1685,13 @@ export default function AdminDashboardPage() {
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" className="w-4 h-4 rounded" checked={!!refCfg.welcome_enabled}
                       onChange={e => setRefCfg({ ...refCfg, welcome_enabled: e.target.checked })} />
-                    <span className="text-sm font-medium text-gray-800">Offre fondateur active <span className="text-gray-400 font-normal">(gratuit jusqu'au 1er contrat)</span></span>
+                    <span className="text-sm font-medium text-gray-800">Offre fondateur active <span className="text-gray-400 font-normal">(visible gratuitement tant que vérifié ; paie avant d'accepter un contrat)</span></span>
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Places fondateur (0 = illimité)</label>
                       <input type="number" className="input-field text-sm" value={refCfg.welcome_max_tutors}
                         onChange={e => setRefCfg({ ...refCfg, welcome_max_tutors: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Jours pour payer (après 1er contrat)</label>
-                      <input type="number" className="input-field text-sm" value={refCfg.welcome_grace_days}
-                        onChange={e => setRefCfg({ ...refCfg, welcome_grace_days: e.target.value })} />
                     </div>
                   </div>
                   <hr className="border-gray-100" />

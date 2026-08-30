@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
-import { filterPhoneAndEmail } from '../utils/helpers'
+import { filterPhoneAndEmail, isTutorVisible } from '../utils/helpers'
 import { deriveDocumentsStatus, buildRejectionReason, computeIsActive } from '../utils/verification'
 
 const AppContext = createContext(null)
@@ -43,6 +43,7 @@ function mapTutor(profile, tutor) {
     monthlyRequests: tutor.monthly_requests || 0,
     isActive: tutor.is_active,
     suspended: tutor.suspended,
+    isFounder: tutor.is_founder,
     diplomaNames: tutor.verification_status === 'verified'
       ? (tutor.documents?.diplomes || []).map(d => d?.name).filter(Boolean)
       : [],
@@ -91,6 +92,7 @@ function mapPublicTutor(r) {
     monthlyRequests: r.monthly_requests || 0,
     isActive: r.is_active,
     suspended: r.suspended,
+    isFounder: r.is_founder,
     diplomaNames: r.diploma_names || [],
     offers,
     priceMin: prices.length ? Math.min(...prices) : (r.monthly_rate || 0),
@@ -366,10 +368,9 @@ export function AppProvider({ children }) {
   }, [showToast])
 
   const getTutor = (id) => tutors.find(t => t.id === id)
-  // Visibilité gratuite : vérifié + non suspendu suffit à être listé.
-  // (L'abonnement payant conditionne l'acceptation d'un contrat, pas l'affichage.)
-  const getActiveTutors = () => tutors.filter(t =>
-    t.verificationStatus === 'verified' && !t.suspended)
+  // V1 « seed-then-gate » : visible = vérifié && !suspendu && (fondateur || abo payant).
+  // getTutor reste non filtré (le profil d'un répétiteur reste accessible par lien direct).
+  const getActiveTutors = () => tutors.filter(isTutorVisible)
   const getPendingTutors = () => tutors.filter(t => t.verificationStatus === 'pending')
 
   const validateTutor = useCallback(async (tutorId, decision, reason = '') => {

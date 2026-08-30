@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext'
 import MarketplaceShell from '../components/layout/MarketplaceShell'
 import TutorCard from '../components/common/TutorCard'
 import { SUBJECTS, CITIES } from '../data/constants'
-import { MODALITIES } from '../utils/helpers'
+import { MODALITIES, isTutorVisible } from '../utils/helpers'
 import { Search, SlidersHorizontal, X, LayoutGrid, List } from 'lucide-react'
 
 export default function SearchPage() {
@@ -29,10 +29,8 @@ export default function SearchPage() {
   const setFilter = (key, val) => setFilters(p => ({ ...p, [key]: val }))
 
   const filtered = useMemo(() => {
-    // Visibilité gratuite : tout répétiteur vérifié et non suspendu est listé.
-    // L'abonnement payant conditionne l'acceptation d'un contrat, pas l'affichage.
-    let result = tutors.filter(t =>
-      t.verificationStatus === 'verified' && !t.suspended)
+    // V1 « seed-then-gate » : visible = vérifié && !suspendu && (fondateur || abo payant).
+    let result = tutors.filter(isTutorVisible)
 
     const offerSubjects = t => (t.offers || []).flatMap(o => o.subjects || [])
 

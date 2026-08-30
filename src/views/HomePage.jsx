@@ -66,9 +66,9 @@ export default function HomePage() {
   ]
 
   const howItWorks = [
-    { step: '01', icon: <Search size={24} />, title: 'Recherchez', desc: 'Cherchez un répétiteur par matière, niveau ou ville. Comparez les profils, tarifs et avis.' },
-    { step: '02', icon: <BookOpen size={24} />, title: 'Contactez', desc: 'Envoyez un message directement au répétiteur et discutez de vos besoins.' },
-    { step: '03', icon: <CheckCircle size={24} />, title: 'Réservez', desc: 'Demandez une séance, choisissez la date et le lieu. C\'est simple et rapide !' },
+    { step: '01', icon: <Search size={24} />, title: 'Trouvez', desc: 'Parcourez les répétiteurs vérifiés par matière, classe ou ville. Comparez profils, tarifs par classe et avis.' },
+    { step: '02', icon: <BookOpen size={24} />, title: 'Recrutez', desc: 'Envoyez votre demande « Je recrute » (un ou plusieurs enfants). Vos coordonnées restent protégées avant le contrat.' },
+    { step: '03', icon: <CheckCircle size={24} />, title: 'Échangez', desc: 'Dès que le répétiteur accepte, la messagerie s\'ouvre. Vous réglez directement à la fin de chaque mois.' },
   ]
 
   const whyUs = [

@@ -20,6 +20,7 @@ export default function RegisterParentPage() {
   const [submitted, setSubmitted] = useState(false)
   const [showOtp, setShowOtp] = useState(false)
   const [otpCode, setOtpCode] = useState('')
+  const [otpStatus, setOtpStatus] = useState('idle')   // 'idle' | 'success' | 'error'
   const [resendTimer, setResendTimer] = useState(60)
   const [resent, setResent] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -85,13 +86,13 @@ export default function RegisterParentPage() {
 
   const handleVerifyOtp = async () => {
     setError('')
-    if (otpCode.replace(/\s/g, '').length !== 8) { setError('Entrez les 8 chiffres du code.'); return }
+    if (otpCode.replace(/\s/g, '').length !== 6) { setError('Entrez les 6 chiffres du code.'); return }
     setLoading(true)
     const result = await verifyOtp(form.email, otpCode)
     setLoading(false)
-    if (!result.success) { setError(result.error || 'Code invalide ou expiré.'); return }
-    setShowOtp(false)
-    setSubmitted(true)
+    if (!result.success) { setOtpStatus('error'); setError(result.error || 'Code invalide ou expiré.'); return }
+    setOtpStatus('success')
+    setTimeout(() => { setShowOtp(false); setSubmitted(true) }, 650)
   }
 
   const handleResend = async () => {
@@ -117,11 +118,12 @@ export default function RegisterParentPage() {
             </div>
             <h1 className="font-display text-2xl font-bold text-gray-900 mb-1">Vérifiez votre email</h1>
             <p className="text-sm text-gray-500 mb-6">
-              Un code à 8 chiffres a été envoyé à<br />
+              Un code à 6 chiffres a été envoyé à<br />
               <strong className="text-gray-800">{form.email}</strong>
             </p>
 
-            <OtpInput value={otpCode} onChange={setOtpCode} focusColorClass="focus:border-secondary" />
+            <OtpInput value={otpCode} status={otpStatus} focusColorClass="focus:border-secondary"
+                      onChange={v => { setOtpCode(v); if (otpStatus !== 'idle') setOtpStatus('idle') }} />
 
             <div className="mt-6 space-y-3">
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</p>}
@@ -129,7 +131,7 @@ export default function RegisterParentPage() {
 
               <button
                 onClick={handleVerifyOtp}
-                disabled={loading || otpCode.replace(/\s/g, '').length < 8}
+                disabled={loading || otpCode.replace(/\s/g, '').length < 6}
                 className="btn-secondary w-full flex items-center justify-center gap-2"
               >
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Vérifier le code'}

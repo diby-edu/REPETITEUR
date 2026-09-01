@@ -132,6 +132,7 @@ export default function RegisterTutorPage() {
   // Étape 1 (OTP)
   const [pendingEmail, setPendingEmail] = useState('')
   const [otpCode, setOtpCode] = useState('')
+  const [otpStatus, setOtpStatus] = useState('idle')   // 'idle' | 'success' | 'error' — anime l'OTP
   const [resent, setResent] = useState(false)
   const [resendTimer, setResendTimer] = useState(0)
 
@@ -407,14 +408,15 @@ export default function RegisterTutorPage() {
 
   const handleVerifyOtp = async () => {
     setError('')
-    if (otpCode.replace(/\s/g, '').length !== 8) { setError('Entrez les 8 chiffres du code.'); return }
+    if (otpCode.replace(/\s/g, '').length !== 6) { setError('Entrez les 6 chiffres du code.'); return }
 
     setLoading(true)
     const result = await verifyOtp(pendingEmail, otpCode)
     setLoading(false)
 
-    if (!result.success) { setError(result.error || 'Code invalide ou expiré.'); return }
-    setStep(2)
+    if (!result.success) { setOtpStatus('error'); setError(result.error || 'Code invalide ou expiré.'); return }
+    setOtpStatus('success')
+    setTimeout(() => setStep(2), 650)   // laisse jouer l'animation de validation
   }
 
   const handleResend = async () => {
@@ -665,19 +667,20 @@ export default function RegisterTutorPage() {
                 </div>
                 <h2 className="font-semibold text-lg text-gray-800 mb-1">Vérifiez votre email</h2>
                 <p className="text-sm text-gray-500">
-                  Un code à 8 chiffres a été envoyé à<br />
+                  Un code à 6 chiffres a été envoyé à<br />
                   <strong className="text-gray-800">{pendingEmail}</strong>
                 </p>
               </div>
 
-              <OtpInput value={otpCode} onChange={setOtpCode} />
+              <OtpInput value={otpCode} status={otpStatus}
+                        onChange={v => { setOtpCode(v); if (otpStatus !== 'idle') setOtpStatus('idle') }} />
 
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-center">{error}</p>}
               {resent && <p className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-center">Code renvoyé !</p>}
 
               <button
                 onClick={handleVerifyOtp}
-                disabled={loading || otpCode.replace(/\s/g,'').length < 8}
+                disabled={loading || otpCode.replace(/\s/g,'').length < 6}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Vérifier le code'}

@@ -32,6 +32,12 @@ function Shell({ children }) {
     DASHBOARD_PREFIXES.some(p => pathname?.startsWith(p)) ||
     (!!currentUser && MARKETPLACE_PREFIXES.some(p => pathname?.startsWith(p)))
 
+  // Écran de choix de profil : plein écran, sans Navbar/Footer (il gère son propre
+  // en-tête + lien « Se connecter »). Les sous-pages /inscription/* gardent la Navbar.
+  if (pathname === '/inscription') {
+    return (<div className="font-sans">{children}<ToastWrapper /></div>)
+  }
+
   if (isDashboard) {
     return (
       <div className="font-sans">

@@ -3,7 +3,7 @@ import SettingsPage from '../../src/views/SettingsPage'
 
 export default function Page() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute allowIncomplete>
       <SettingsPage />
     </ProtectedRoute>
   )

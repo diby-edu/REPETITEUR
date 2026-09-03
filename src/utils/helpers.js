@@ -95,6 +95,39 @@ export const isTutorVisible = (t) =>
   t?.verificationStatus === 'verified' && !t?.suspended &&
   (t?.isFounder || hasActivePaidSub(t))
 
+// Inscription terminée ? Un utilisateur connecté mais dont l'inscription n'est
+// PAS finie (répétiteur sans KYC, parent sans identité) doit être renvoyé finir
+// avant d'accéder à l'app. Distingue « incomplet » de « complet en attente de vérif ».
+export function isRegistrationComplete(user) {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  if (user.role === 'parent') {
+    return !!(user.firstName && user.lastName && user.city)
+  }
+  if (user.role === 'tutor') {
+    // Déjà passé par la revue admin (vérifié ou rejeté) → forcément past-inscription.
+    // Protège les tuteurs existants (même sans photo) contre un blocage à tort.
+    if (user.verificationStatus === 'verified' || user.verificationStatus === 'rejected') return true
+    const docs = user.documents || {}
+    const basic = !!(user.firstName && user.lastName && user.phone && user.city && user.bio?.trim() && user.avatarUrl)
+    const primaireOnly = user.levels?.length === 1 && user.levels[0] === 'Primaire'
+    const expertise = (user.levels?.length > 0) && (primaireOnly || user.subjects?.length > 0) &&
+      user.monthlyRate > 0 && (user.modalities?.length > 0)
+    const hasId = docs.idType === 'cni' ? !!(docs.cniRecto && docs.cniVerso)
+      : docs.idType === 'passport' ? !!docs.passport : false
+    const hasDocuments = hasId && (docs.diplomes?.length > 0)
+    const hasSelfie = !!docs.selfiePath
+    return basic && expertise && hasDocuments && hasSelfie
+  }
+  return true
+}
+
+// Où renvoyer un utilisateur pour TERMINER son inscription.
+//  • répétiteur → le flux d'inscription (reprend le KYC multi-étapes)
+//  • parent     → ses réglages (il ne manque que nom/ville → il complète + enregistre)
+export const registrationResumePath = (user) =>
+  user?.role === 'tutor' ? '/inscription/repetiteur' : '/parametres'
+
 export function getStatusLabel(status) {
   const labels = {
     pending: 'En attente',

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../context/AuthContext'
+import { isRegistrationComplete, registrationResumePath } from '../utils/helpers'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 
 export default function LoginPage() {
@@ -15,6 +16,7 @@ export default function LoginPage() {
 
   const redirectAfterLogin = (user) => {
     if (user.role === 'admin') router.push('/admin')
+    else if (!isRegistrationComplete(user)) router.push(registrationResumePath(user))
     else if (user.role === 'tutor') router.push('/tableau-de-bord/repetiteur')
     else router.push('/tableau-de-bord/parent')
   }
